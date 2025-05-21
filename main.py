@@ -6,8 +6,8 @@ from io import BytesIO
 
 # Spotify Auth
 sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
-    client_id='YOUR_SPOTIFY_CLIENT_ID',
-    client_secret='YOUR_SPOTIFY_CLIENT_SECRET'
+    client_id='70eca55b355f4bd788c18f94a35a69ad',
+    client_secret='cf5a8af3294e4cff9968f2992ccbe0e6'
 ))
 
 def search_song_metadata(query):
