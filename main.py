@@ -411,7 +411,7 @@ def main():
     tagger = AudioMetadataTagger()
     
     # Example usage - single file
-    song_name = "File name"
+    song_name = "SpotiDownloader.com - All That We Could Have Been - Alex Sampson"
     file_path = f"{song_name}.mp3"
     
     if os.path.exists(file_path):
