@@ -7,7 +7,6 @@ import path from 'node:path'
 const nodeBuiltins = [
   'electron',
   'dotenv',
-  'music-metadata',
   'node-id3',
   ...builtinModules,
   ...builtinModules.map((m) => `node:${m}`),
