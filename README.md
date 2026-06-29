@@ -1,6 +1,7 @@
 # MP3 Tag Editor
 
 [![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
+[![CI](https://github.com/axcel-blade/MP3-Tag-Editor/actions/workflows/ci.yml/badge.svg)](https://github.com/axcel-blade/MP3-Tag-Editor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Electron desktop app that reads MP3 ID3 tags, searches multiple metadata APIs in parallel, and lets you selectively apply tags—including lyrics and album artwork—back to your files.

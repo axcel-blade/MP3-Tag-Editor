@@ -11,6 +11,7 @@ Track active and upcoming work items. See [ROADMAP.md](ROADMAP.md) for longer-te
 - [x] Musixmatch lyrics support
 - [x] Git Flow branches and project documentation
 - [x] Packaged installers (Windows/macOS/Linux via electron-builder)
+- [x] GitHub Actions CI and release workflows
 - [x] Unit tests for `electron/mp3.js` read/write
 - [ ] Provider integration tests (mocked HTTP)
 

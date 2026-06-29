@@ -79,6 +79,10 @@ npm run dist:linux
 
 Output goes to the `release/` folder. End users can install without Node.js or npm.
 
+**CI:** Pushes and pull requests to `main` / `develop` run lint, tests, and build via GitHub Actions (`.github/workflows/ci.yml`).
+
+**Releases:** Push a version tag (e.g. `v1.2.0`) to build Windows, macOS, and Linux installers and publish a GitHub Release (`.github/workflows/release.yml`).
+
 **Note:** macOS and Linux builds must typically be run on their target OS (or CI). Windows builds work on your current machine.
 
 ## Troubleshooting
