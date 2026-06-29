@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { renameMp3File } from '../electron/rename.js'
 import {
   applyRenameTemplate,
   buildRenameFilename,
@@ -38,5 +42,31 @@ describe('buildRenameFilename', () => {
 
   it('falls back to original base when template resolves empty', () => {
     expect(buildRenameFilename('{artist}', {}, 'fallback-name')).toBe('fallback-name.mp3')
+  })
+})
+
+describe('renameMp3File', () => {
+  let tempDir
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'mp3-rename-'))
+  })
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true })
+  })
+
+  it('returns the new path after renaming', async () => {
+    const sourcePath = join(tempDir, 'original.mp3')
+    await writeFile(sourcePath, Buffer.from('mp3'))
+
+    const renamedPath = await renameMp3File(
+      sourcePath,
+      { artist: 'Artist', title: 'Title' },
+      '{artist} - {title}',
+    )
+
+    expect(renamedPath).toBe(join(tempDir, 'Artist - Title.mp3'))
+    await expect(readFile(renamedPath)).resolves.toBeDefined()
   })
 })
