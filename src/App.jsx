@@ -586,7 +586,7 @@ function App() {
   }
 
   const handleOpenReleasePage = async () => {
-    const url = (await window.electronAPI?.getUpdateReleasePage?.()) ?? 'https://github.com/axcel-blade/MP3-Tag-Editor/releases/latest'
+    const url = (await window.electronAPI?.getUpdateReleasePage?.()) ?? 'https://github.com/axcel-blade/mp3-tag-editor/releases/latest'
     window.open(url, '_blank', 'noopener')
   }
 

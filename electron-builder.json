@@ -15,7 +15,7 @@
   "publish": {
     "provider": "github",
     "owner": "axcel-blade",
-    "repo": "MP3-Tag-Editor",
+    "repo": "mp3-tag-editor",
     "releaseType": "release"
   },
   "win": {

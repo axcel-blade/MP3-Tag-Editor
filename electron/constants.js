@@ -10,4 +10,8 @@ export const APP_DISPLAY_NAME = 'MP3 Tag Editor'
 export const APP_NAME = 'MP3TagEditor'
 
 /** Default MusicBrainz User-Agent when none is configured in .env. */
-export const DEFAULT_USER_AGENT = `${APP_NAME}/${APP_VERSION} (https://github.com/axcel-blade/mp3-tag-editor)`
+export const GITHUB_OWNER = 'axcel-blade'
+export const GITHUB_REPO = 'mp3-tag-editor'
+export const GITHUB_RELEASES_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`
+
+export const DEFAULT_USER_AGENT = `${APP_NAME}/${APP_VERSION} (https://github.com/${GITHUB_OWNER}/${GITHUB_REPO})`

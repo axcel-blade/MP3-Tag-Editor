@@ -66,4 +66,8 @@ describe('backupMp3File', () => {
   it('throws when no backup exists', async () => {
     await expect(restoreMp3Backup(sourcePath)).rejects.toThrow(/No backup available/)
   })
+
+  it('throws when the source file does not exist', async () => {
+    await expect(backupMp3File(join(tempDir, 'missing.mp3'))).rejects.toThrow(/file not found/)
+  })
 })

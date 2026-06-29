@@ -1,10 +1,11 @@
 import { createRequire } from 'node:module'
 import { app } from 'electron'
 import { logger } from './logger.js'
+import { GITHUB_OWNER, GITHUB_REPO, GITHUB_RELEASES_URL } from './constants.js'
 
 const require = createRequire(import.meta.url)
 
-const RELEASE_PAGE = 'https://github.com/axcel-blade/MP3-Tag-Editor/releases/latest'
+const RELEASE_PAGE = GITHUB_RELEASES_URL
 
 let getMainWindow = () => null
 let autoUpdater = null
@@ -38,6 +39,11 @@ export function initAutoUpdater(resolveMainWindow) {
 
   getMainWindow = resolveMainWindow
   const updater = resolveAutoUpdater()
+  updater.setFeedURL({
+    provider: 'github',
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+  })
   updater.autoDownload = false
   updater.autoInstallOnAppQuit = true
 
