@@ -130,19 +130,23 @@ ipcMain.handle('mp3:readTags', async (_event, filePath) => {
 })
 
 ipcMain.handle('mp3:writeTags', async (_event, filePath, fields, includeArtwork, artworkUrl) => {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('No MP3 file selected')
+  }
+  const resolvedFilePath = path.resolve(filePath)
   try {
-    const backupPath = await backupMp3File(filePath)
-    let tags = await writeMp3Tags(filePath, fields, includeArtwork, artworkUrl)
-    let finalPath = filePath
+    const backupPath = await backupMp3File(resolvedFilePath)
+    let tags = await writeMp3Tags(resolvedFilePath, fields, includeArtwork, artworkUrl)
+    let finalPath = resolvedFilePath
 
     const settings = await getAppSettings()
     if (settings.autoRenameEnabled) {
-      const renamedPath = await renameMp3File(filePath, tags, settings.renameTemplate)
-      if (renamedPath !== filePath) {
-        transferBackup(filePath, renamedPath)
+      const renamedPath = await renameMp3File(resolvedFilePath, tags, settings.renameTemplate)
+      if (renamedPath !== resolvedFilePath) {
+        transferBackup(resolvedFilePath, renamedPath)
         finalPath = renamedPath
         tags = await readMp3Tags(finalPath)
-        logger.info('File renamed after tag write', { from: path.basename(filePath), to: path.basename(finalPath) })
+        logger.info('File renamed after tag write', { from: path.basename(resolvedFilePath), to: path.basename(finalPath) })
       }
     }
 
@@ -150,23 +154,25 @@ ipcMain.handle('mp3:writeTags', async (_event, filePath, fields, includeArtwork,
       file: path.basename(finalPath),
       fields: Object.keys(fields),
       artwork: includeArtwork,
-      renamed: finalPath !== filePath,
+      renamed: finalPath !== resolvedFilePath,
     })
-    return { tags, backupPath, filePath: finalPath, renamed: finalPath !== filePath }
+    return { tags, backupPath, filePath: finalPath, renamed: finalPath !== resolvedFilePath }
   } catch (err) {
-    logger.error('mp3:writeTags failed', { file: filePath, error: err.message })
+    logger.error('mp3:writeTags failed', { file: resolvedFilePath, error: err.message })
     throw err
   }
 })
 
 ipcMain.handle('mp3:undoWrite', async (_event, filePath) => {
+  const resolvedFilePath = path.resolve(filePath)
   try {
-    const restoredPath = await restoreMp3Backup(filePath)
+    const restoredPath = await restoreMp3Backup(resolvedFilePath)
     clearBackup(restoredPath)
     logger.info('Undid tag write', { file: path.basename(restoredPath) })
-    return readMp3Tags(restoredPath)
+    const tags = await readMp3Tags(restoredPath)
+    return { ...tags, filePath: restoredPath }
   } catch (err) {
-    logger.error('mp3:undoWrite failed', { file: filePath, error: err.message })
+    logger.error('mp3:undoWrite failed', { file: resolvedFilePath, error: err.message })
     throw err
   }
 })

@@ -118,6 +118,8 @@ function App() {
     spotifyClientSecret: '',
     hasEnvFile: false,
   })
+  const [isEditingTags, setIsEditingTags] = useState(false)
+  const [manualDraft, setManualDraft] = useState(null)
   const [appSettings, setAppSettings] = useState({
     autoRenameEnabled: false,
     renameTemplate: DEFAULT_RENAME_TEMPLATE,
@@ -221,6 +223,8 @@ function App() {
     setError('')
     resetSelection()
     setCanUndo(false)
+    setIsEditingTags(false)
+    setManualDraft(null)
     setMetadataResults([])
     setProviderErrors([])
     setFilePath(path)
@@ -324,6 +328,85 @@ function App() {
     setSelectedFields((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
+  const replaceSelectedFilePath = useCallback((oldPath, newPath) => {
+    if (!newPath || newPath === oldPath) return
+    setFilePath(newPath)
+    setFilePaths((prev) => {
+      if (prev.length === 0) return [newPath]
+      return prev.map((p) => (p === oldPath ? newPath : p))
+    })
+    setCurrentTags((prev) =>
+      prev ? { ...prev, filePath: newPath, fileName: basename(newPath) } : prev,
+    )
+  }, [])
+
+  const applyWriteResult = useCallback(
+    (result, pathBeforeWrite, statusMessage) => {
+      setCanUndo(true)
+      if (result.filePath && result.filePath !== pathBeforeWrite) {
+        replaceSelectedFilePath(pathBeforeWrite, result.filePath)
+        setCurrentTags({ ...result.tags, filePath: result.filePath })
+      } else {
+        setCurrentTags(result.tags)
+      }
+      setStatus(statusMessage(result.tags.fileName))
+    },
+    [replaceSelectedFilePath],
+  )
+
+  const startEditingTags = () => {
+    if (!currentTags) return
+    setManualDraft({
+      ...Object.fromEntries(TAG_FIELDS.map(({ key }) => [key, currentTags[key] ?? ''])),
+      lyrics: currentTags.lyrics ?? '',
+    })
+    setIsEditingTags(true)
+    setError('')
+  }
+
+  const cancelEditingTags = () => {
+    setIsEditingTags(false)
+    setManualDraft(null)
+  }
+
+  const updateManualDraft = (key, value) => {
+    setManualDraft((prev) => (prev ? { ...prev, [key]: value } : prev))
+  }
+
+  /** Save manually edited tags from the Current Tags panel. */
+  const handleManualSaveTags = async () => {
+    if (!filePath || !currentTags || !manualDraft) return
+
+    const fieldsToWrite = {}
+    TAG_FIELDS.forEach(({ key }) => {
+      const next = manualDraft[key] ?? ''
+      const prev = currentTags[key] ?? ''
+      if (next !== prev) fieldsToWrite[key] = next
+    })
+
+    const nextLyrics = manualDraft.lyrics ?? ''
+    const prevLyrics = currentTags.lyrics ?? ''
+    if (nextLyrics !== prevLyrics) fieldsToWrite.lyrics = nextLyrics
+
+    if (Object.keys(fieldsToWrite).length === 0) {
+      setError('No tag changes to save.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      const result = await window.electronAPI.writeMp3Tags(filePath, fieldsToWrite, false, null)
+      applyWriteResult(result, filePath, (name) => `Tags saved manually: ${name} (Undo available)`)
+      setIsEditingTags(false)
+      setManualDraft(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   /** Write checked fields (and optional artwork/lyrics) to the open MP3 file. */
   const handleApplyTags = async () => {
     if (!filePath || !selectedTrack) return
@@ -353,16 +436,14 @@ function App() {
         includeArtwork && selectedTrack.artworkUrl,
         selectedTrack.artworkUrl,
       )
-      setCurrentTags(result.tags)
-      setCanUndo(true)
-
-      if (result.filePath && result.filePath !== filePath) {
-        setFilePath(result.filePath)
-        setFilePaths((prev) => prev.map((p) => (p === filePath ? result.filePath : p)))
-        setStatus(`Tags saved and renamed to ${result.tags.fileName} (Undo available)`)
-      } else {
-        setStatus(`Tags saved: ${result.tags.fileName} (backup created — Undo available)`)
-      }
+      applyWriteResult(
+        result,
+        filePath,
+        (name) =>
+          result.filePath && result.filePath !== filePath
+            ? `Tags saved and renamed to ${name} (Undo available)`
+            : `Tags saved: ${name} (backup created — Undo available)`,
+      )
       resetSelection()
     } catch (err) {
       setError(err.message)
@@ -378,12 +459,13 @@ function App() {
     setError('')
     try {
       const restored = await window.electronAPI.undoMp3Write(filePath)
-      setCurrentTags(restored)
       if (restored.filePath && restored.filePath !== filePath) {
-        setFilePath(restored.filePath)
-        setFilePaths((prev) => prev.map((p) => (p === filePath ? restored.filePath : p)))
+        replaceSelectedFilePath(filePath, restored.filePath)
       }
+      setCurrentTags(restored)
       setCanUndo(false)
+      setIsEditingTags(false)
+      setManualDraft(null)
       resetSelection()
       setStatus(`Reverted to backup: ${restored.fileName}`)
     } catch (err) {
@@ -528,7 +610,42 @@ function App() {
 
         <main className="main">
           <section className="panel current-tags">
-            <h2>Current Tags</h2>
+            <div className="panel-header">
+              <h2>Current Tags</h2>
+              {currentTags && (
+                <div className="tag-edit-actions">
+                  {!isEditingTags ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={startEditingTags}
+                      disabled={loading}
+                    >
+                      Edit tags
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={cancelEditingTags}
+                        disabled={loading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={handleManualSaveTags}
+                        disabled={loading}
+                      >
+                        Save tags
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             {!currentTags ? (
               <p className="placeholder">Open an MP3 file, folder, or drag &amp; drop files here</p>
             ) : (
@@ -546,22 +663,58 @@ function App() {
                     <div className="cover cover-placeholder">No cover</div>
                   </div>
                 )}
-                <dl className="tag-list">
-                  {TAG_FIELDS.map(({ key, label }) => (
-                    <div key={key} className="tag-row">
-                      <dt>{label}</dt>
-                      <dd>{currentTags[key] || '—'}</dd>
+                {isEditingTags && manualDraft ? (
+                  <form
+                    className="manual-tag-form"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      handleManualSaveTags()
+                    }}
+                  >
+                    {TAG_FIELDS.map(({ key, label }) => (
+                      <label key={key} className="manual-tag-field">
+                        <span>{label}</span>
+                        <input
+                          type="text"
+                          value={manualDraft[key] ?? ''}
+                          onChange={(e) => updateManualDraft(key, e.target.value)}
+                          disabled={loading}
+                        />
+                      </label>
+                    ))}
+                    <label className="manual-tag-field manual-tag-field-lyrics">
+                      <span>Lyrics</span>
+                      <textarea
+                        value={manualDraft.lyrics ?? ''}
+                        onChange={(e) => updateManualDraft('lyrics', e.target.value)}
+                        disabled={loading}
+                        rows={5}
+                        placeholder="Unsynchronised lyrics (USLT)"
+                      />
+                    </label>
+                    <div className="manual-tag-meta">
+                      <span className="manual-tag-meta-label">File</span>
+                      <span className="file-path">{currentTags.fileName}</span>
                     </div>
-                  ))}
-                  <div className="tag-row file-row">
-                    <dt>File</dt>
-                    <dd className="file-path">{currentTags.fileName}</dd>
-                  </div>
-                  <div className="tag-row lyrics-row">
-                    <dt>Lyrics</dt>
-                    <dd className="lyrics-preview">{previewLyrics(currentTags.lyrics)}</dd>
-                  </div>
-                </dl>
+                  </form>
+                ) : (
+                  <dl className="tag-list">
+                    {TAG_FIELDS.map(({ key, label }) => (
+                      <div key={key} className="tag-row">
+                        <dt>{label}</dt>
+                        <dd>{currentTags[key] || '—'}</dd>
+                      </div>
+                    ))}
+                    <div className="tag-row file-row">
+                      <dt>File</dt>
+                      <dd className="file-path">{currentTags.fileName}</dd>
+                    </div>
+                    <div className="tag-row lyrics-row">
+                      <dt>Lyrics</dt>
+                      <dd className="lyrics-preview">{previewLyrics(currentTags.lyrics)}</dd>
+                    </div>
+                  </dl>
+                )}
               </div>
             )}
           </section>

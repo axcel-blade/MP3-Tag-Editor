@@ -31,9 +31,12 @@ export async function renameMp3File(filePath, tags, template) {
   try {
     await fs.access(newPath)
     const uniqueName = await resolveUniqueName(dir, newName)
-    return fs.rename(filePath, path.join(dir, uniqueName))
+    const targetPath = path.join(dir, uniqueName)
+    await fs.rename(filePath, targetPath)
+    return targetPath
   } catch {
-    return fs.rename(filePath, newPath)
+    await fs.rename(filePath, newPath)
+    return newPath
   }
 }
 

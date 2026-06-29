@@ -94,6 +94,11 @@
   background: var(--btn-secondary-hover);
 }
 
+.btn-sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+}
+
 .banner {
   padding: 0.65rem 1.5rem;
   font-size: 0.875rem;
@@ -320,6 +325,74 @@
 .tag-row dd {
   margin: 0;
   word-break: break-word;
+}
+
+.tag-edit-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.manual-tag-form {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.manual-tag-field {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.manual-tag-field-lyrics {
+  align-items: start;
+}
+
+.manual-tag-field span {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.manual-tag-field input,
+.manual-tag-field textarea {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  color: var(--text);
+  font: inherit;
+  width: 100%;
+}
+
+.manual-tag-field input:focus,
+.manual-tag-field textarea:focus {
+  outline: none;
+  border-color: #1db954;
+}
+
+.manual-tag-field textarea {
+  min-height: 5rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.manual-tag-meta {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.5rem;
+  padding-top: 0.35rem;
+  font-size: 0.875rem;
+  border-top: 1px solid var(--border);
+}
+
+.manual-tag-meta-label {
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 .file-path {

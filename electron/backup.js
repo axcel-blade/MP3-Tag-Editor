@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import crypto from 'node:crypto'
 
 let resolveBackupsRoot = null
 
@@ -26,49 +27,60 @@ const lastBackups = new Map()
  * @returns {Promise<string>} Absolute path to the backup file
  */
 export async function backupMp3File(filePath) {
-  await fs.mkdir(backupsRoot(), { recursive: true })
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const base = path.basename(filePath, path.extname(filePath))
-  const backupPath = path.join(backupsRoot(), `${base}-${stamp}.mp3.bak`)
-  await fs.copyFile(filePath, backupPath)
-  lastBackups.set(filePath, { backupPath, pathBeforeRename: filePath })
+  const resolvedPath = path.resolve(filePath)
+
+  try {
+    await fs.access(resolvedPath)
+  } catch {
+    throw new Error(`Cannot create backup: file not found (${resolvedPath})`)
+  }
+
+  const root = backupsRoot()
+  await fs.mkdir(root, { recursive: true })
+
+  const backupPath = path.join(root, `${crypto.randomUUID()}.mp3.bak`)
+  await fs.copyFile(resolvedPath, backupPath)
+  lastBackups.set(resolvedPath, { backupPath, pathBeforeRename: resolvedPath })
   return backupPath
 }
 
 /** Move undo tracking when a file is renamed after write. */
 export function transferBackup(oldPath, newPath) {
-  const entry = lastBackups.get(oldPath)
+  const resolvedOld = path.resolve(oldPath)
+  const resolvedNew = path.resolve(newPath)
+  const entry = lastBackups.get(resolvedOld)
   if (!entry) return
-  lastBackups.delete(oldPath)
-  lastBackups.set(newPath, entry)
+  lastBackups.delete(resolvedOld)
+  lastBackups.set(resolvedNew, entry)
 }
 
 /** Restore backup content and original filename when the file was auto-renamed. */
 export async function restoreMp3Backup(filePath) {
-  const entry = lastBackups.get(filePath)
+  const resolvedPath = path.resolve(filePath)
+  const entry = lastBackups.get(resolvedPath)
   if (!entry) {
     throw new Error('No backup available to undo for this file')
   }
   await fs.access(entry.backupPath)
-  await fs.copyFile(entry.backupPath, filePath)
+  await fs.copyFile(entry.backupPath, resolvedPath)
 
-  if (entry.pathBeforeRename && path.normalize(entry.pathBeforeRename) !== path.normalize(filePath)) {
+  if (entry.pathBeforeRename && path.normalize(entry.pathBeforeRename) !== path.normalize(resolvedPath)) {
     try {
-      await fs.rename(filePath, entry.pathBeforeRename)
+      await fs.rename(resolvedPath, entry.pathBeforeRename)
       return entry.pathBeforeRename
     } catch {
       // Target name may exist; keep restored content at current path
     }
   }
-  return filePath
+  return resolvedPath
 }
 
 /** Return the latest backup path for a file, if any. */
 export function getLastBackupPath(filePath) {
-  return lastBackups.get(filePath)?.backupPath ?? null
+  return lastBackups.get(path.resolve(filePath))?.backupPath ?? null
 }
 
 /** Clear undo state after the user dismisses undo or loads a different file. */
 export function clearBackup(filePath) {
-  lastBackups.delete(filePath)
+  lastBackups.delete(path.resolve(filePath))
 }
