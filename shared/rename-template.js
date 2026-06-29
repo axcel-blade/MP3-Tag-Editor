@@ -1,6 +1,9 @@
 /** Default filename pattern when auto-rename is enabled. */
 export const DEFAULT_RENAME_TEMPLATE = '{artist} - {title}'
 
+/** Max characters for the filename stem (without .mp3) on Windows-friendly paths. */
+export const MAX_FILENAME_STEM_LENGTH = 120
+
 const RESERVED_FILENAME_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*'])
 
 function removeInvalidFilenameChars(value) {
@@ -42,9 +45,16 @@ export function sanitizeFilename(stem) {
     .trim()
 }
 
-export function buildRenameFilename(template, tags, originalBaseName = 'song') {
+export function truncateFilenameStem(stem, maxLength = MAX_FILENAME_STEM_LENGTH) {
+  const trimmed = String(stem).trim()
+  if (trimmed.length <= maxLength) return trimmed
+  return sanitizeFilename(trimmed.slice(0, maxLength))
+}
+
+export function buildRenameFilename(template, tags, originalBaseName = 'song', options = {}) {
+  const maxStemLength = options.maxStemLength ?? MAX_FILENAME_STEM_LENGTH
   const raw = applyRenameTemplate(template || DEFAULT_RENAME_TEMPLATE, tags, originalBaseName)
-  const stem = sanitizeFilename(raw) || originalBaseName
+  const stem = truncateFilenameStem(sanitizeFilename(raw) || originalBaseName, maxStemLength)
   return `${stem}.mp3`
 }
 

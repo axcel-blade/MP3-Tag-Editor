@@ -2,11 +2,13 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { renameMp3File, previewRename } from '../electron/rename.js'
+import { renameMp3File, previewRename, maxStemLengthForDir } from '../electron/rename.js'
 import {
   applyRenameTemplate,
   buildRenameFilename,
   sanitizeFilename,
+  truncateFilenameStem,
+  MAX_FILENAME_STEM_LENGTH,
 } from '../shared/rename-template.js'
 
 describe('applyRenameTemplate', () => {
@@ -33,6 +35,23 @@ describe('sanitizeFilename', () => {
   })
 })
 
+describe('truncateFilenameStem', () => {
+  it('shortens very long artist lists for Windows paths', () => {
+    const longArtist = 'A'.repeat(200)
+    const truncated = truncateFilenameStem(`${longArtist} - Title`, 120)
+    expect(truncated.length).toBeLessThanOrEqual(120)
+    expect(truncated.length).toBeGreaterThan(0)
+  })
+})
+
+describe('maxStemLengthForDir', () => {
+  it('reduces stem length for deep directory paths', () => {
+    const deepDir = `C:\\Users\\test\\${'nested\\'.repeat(20)}`
+    expect(maxStemLengthForDir(deepDir)).toBeLessThan(MAX_FILENAME_STEM_LENGTH)
+    expect(maxStemLengthForDir(deepDir)).toBeGreaterThanOrEqual(32)
+  })
+})
+
 describe('buildRenameFilename', () => {
   it('appends .mp3 extension', () => {
     expect(
@@ -48,6 +67,18 @@ describe('buildRenameFilename', () => {
     expect(
       buildRenameFilename('{filename}', { title: 'Ignored' }, 'original-song'),
     ).toBe('original-song.mp3')
+  })
+
+  it('truncates extremely long template output', () => {
+    const manyArtists = Array.from({ length: 20 }, (_, i) => `Artist ${i}`).join(', ')
+    const fileName = buildRenameFilename(
+      '{artist} - {title}',
+      { artist: manyArtists, title: 'Sthuthi Sri Lanka' },
+      'original',
+      { maxStemLength: 80 },
+    )
+    expect(fileName.endsWith('.mp3')).toBe(true)
+    expect(fileName.length).toBeLessThanOrEqual(84)
   })
 })
 
@@ -112,5 +143,21 @@ describe('renameMp3File', () => {
     expect(renamedPath).toBe(join(tempDir, 'Artist - Title (1).mp3'))
     await expect(readFile(renamedPath)).resolves.toEqual(Buffer.from('new'))
     await expect(readFile(existingPath)).resolves.toEqual(Buffer.from('existing'))
+  })
+
+  it('truncates long auto-rename targets instead of exceeding path limits', async () => {
+    const sourcePath = join(tempDir, '1-01 Sthuthi Sri Lanka.mp3')
+    await writeFile(sourcePath, Buffer.from('mp3'))
+    const manyArtists = Array.from({ length: 20 }, (_, i) => `Artist ${i}`).join(', ')
+
+    const renamedPath = await renameMp3File(
+      sourcePath,
+      { artist: manyArtists, title: 'Sthuthi Sri Lanka' },
+      '{artist} - {title}',
+    )
+
+    expect(renamedPath).not.toBe(sourcePath)
+    expect(renamedPath.length).toBeLessThan(260)
+    await expect(readFile(renamedPath)).resolves.toBeDefined()
   })
 })
