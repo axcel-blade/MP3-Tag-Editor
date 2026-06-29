@@ -523,7 +523,7 @@ function App() {
     return buildRenameFilename(appSettings.renameTemplate, currentTags ?? SAMPLE_TAGS_FOR_PREVIEW, sampleBase)
   }, [appSettings.renameTemplate, currentTags])
 
-  const showFileList = filePaths.length > 1
+  const showFileList = filePaths.length > 0 && (folderPath != null || filePaths.length > 1)
 
   return (
     <div
@@ -581,30 +581,34 @@ function App() {
       <div className={`workspace ${showFileList ? 'with-sidebar' : ''}`}>
         {showFileList && (
           <aside className="panel file-list-panel">
-            <div className="panel-header">
-              <h2>Files</h2>
-              <span className="file-count">{filePaths.length}</span>
+            <div className="file-list-panel-head">
+              <div className="panel-header">
+                <h2>{folderPath ? 'Folder' : 'Files'}</h2>
+                <span className="file-count">{filePaths.length}</span>
+              </div>
+              {folderPath && (
+                <p className="folder-path" title={folderPath}>
+                  {folderPath}
+                </p>
+              )}
             </div>
-            {folderPath && (
-              <p className="folder-path" title={folderPath}>
-                {basename(folderPath)}
-              </p>
-            )}
-            <ul className="file-list">
-              {filePaths.map((path) => (
-                <li key={path}>
-                  <button
-                    type="button"
-                    className={`file-item ${path === filePath ? 'active' : ''}`}
-                    onClick={() => handleSelectFile(path)}
-                    disabled={loading}
-                    title={path}
-                  >
-                    {basename(path)}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="file-list-scroll">
+              <ul className="file-list">
+                {filePaths.map((path) => (
+                  <li key={path}>
+                    <button
+                      type="button"
+                      className={`file-item ${path === filePath ? 'active' : ''}`}
+                      onClick={() => handleSelectFile(path)}
+                      disabled={loading}
+                      title={path}
+                    >
+                      {basename(path)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </aside>
         )}
 
@@ -649,7 +653,8 @@ function App() {
             {!currentTags ? (
               <p className="placeholder">Open an MP3 file, folder, or drag &amp; drop files here</p>
             ) : (
-              <div className="tags-grid">
+              <div className="current-tags-body">
+                <div className="tags-grid">
                 {currentTags.picture?.data ? (
                   <div className="cover-wrap">
                     <img
@@ -715,17 +720,19 @@ function App() {
                     </div>
                   </dl>
                 )}
+                </div>
               </div>
             )}
           </section>
 
           <section className="panel metadata-results">
-            <div className="panel-header">
-              <h2>Metadata Results</h2>
-              {searchQuery && <span className="query-badge">Query: {searchQuery}</span>}
-            </div>
+            <div className="metadata-results-head">
+              <div className="panel-header">
+                <h2>Metadata Results</h2>
+                {searchQuery && <span className="query-badge">Query: {searchQuery}</span>}
+              </div>
 
-            <div className="search-sources">
+              <div className="search-sources">
               <span className="search-sources-label">Search from</span>
               <div className="search-source-chips">
                 {SEARCH_PROVIDERS.map((provider) => {
@@ -785,7 +792,9 @@ function App() {
                 Search
               </button>
             </form>
+            </div>
 
+            <div className="metadata-results-body">
             {loading && (
               <p className="loading">
                 Searching {searchProviders.map(providerLabel).join(', ')}...
@@ -827,6 +836,7 @@ function App() {
                 </li>
               ))}
             </ul>
+            </div>
           </section>
         </main>
       </div>
