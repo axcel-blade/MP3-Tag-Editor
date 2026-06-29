@@ -12,6 +12,7 @@
     "package.json"
   ],
   "asar": true,
+  "publish": null,
   "win": {
     "target": ["nsis"]
   },
@@ -25,6 +26,11 @@
   },
   "linux": {
     "target": ["AppImage", "deb"],
-    "category": "Audio"
+    "category": "Audio",
+    "maintainer": "Axcel Blade <56168280+axcel-blade@users.noreply.github.com>",
+    "desktop": {
+      "Name": "MP3 Tag Editor",
+      "StartupWMClass": "mp3-tag-editor"
+    }
   }
 }

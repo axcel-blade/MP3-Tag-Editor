@@ -1,6 +1,6 @@
 # MP3 Tag Editor
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.1-blue.svg)](CHANGELOG.md)
 [![CI](https://github.com/axcel-blade/MP3-Tag-Editor/actions/workflows/ci.yml/badge.svg)](https://github.com/axcel-blade/MP3-Tag-Editor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
