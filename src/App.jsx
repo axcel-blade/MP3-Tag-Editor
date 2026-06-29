@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { buildRenameFilename, DEFAULT_RENAME_TEMPLATE, RENAME_PLACEHOLDERS } from '@shared/rename-template.js'
+import { THEME_OPTIONS, applyTheme, normalizeThemeMode } from './theme.js'
 import './App.css'
 
 const SAMPLE_TAGS_FOR_PREVIEW = {
@@ -120,29 +121,48 @@ function App() {
   const [appSettings, setAppSettings] = useState({
     autoRenameEnabled: false,
     renameTemplate: DEFAULT_RENAME_TEMPLATE,
-    theme: 'dark',
+    theme: 'system',
   })
+  const [systemTheme, setSystemTheme] = useState(null)
 
   useEffect(() => {
     window.electronAPI?.getApiConfig().then(setApiConfig)
-    window.electronAPI?.getAppSettings().then(setAppSettings)
+    window.electronAPI?.getAppSettings().then((settings) => {
+      setAppSettings({
+        ...settings,
+        theme: normalizeThemeMode(settings.theme),
+      })
+    })
+    window.electronAPI?.getSystemTheme?.().then(setSystemTheme)
   }, [])
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', appSettings.theme ?? 'dark')
+    applyTheme(appSettings.theme, systemTheme)
+  }, [appSettings.theme, systemTheme])
+
+  useEffect(() => {
+    if (appSettings.theme !== 'system') return undefined
+
+    const unsubscribeNative = window.electronAPI?.onSystemThemeChanged?.((theme) => {
+      setSystemTheme(theme)
+    })
+
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const onMediaChange = () => {
+      setSystemTheme(media.matches ? 'dark' : 'light')
+    }
+    media.addEventListener('change', onMediaChange)
+
+    return () => {
+      unsubscribeNative?.()
+      media.removeEventListener('change', onMediaChange)
+    }
   }, [appSettings.theme])
 
   useEffect(() => {
     if (!showSettings) return
     window.electronAPI?.getLogInfo().then(setLogInfo)
   }, [showSettings])
-
-  const toggleTheme = async () => {
-    const nextTheme = appSettings.theme === 'light' ? 'dark' : 'light'
-    const updated = { ...appSettings, theme: nextTheme }
-    setAppSettings(updated)
-    await window.electronAPI?.saveAppSettings(updated)
-  }
 
   const filteredResults = useMemo(() => {
     if (sourceFilter === 'All') return metadataResults
@@ -447,14 +467,6 @@ function App() {
           <p className="subtitle">Musixmatch · MusicBrainz · Last.fm · iTunes · Spotify · Deezer</p>
         </div>
         <div className="header-actions">
-          <button
-            type="button"
-            className="btn btn-secondary theme-toggle"
-            onClick={toggleTheme}
-            title={appSettings.theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-          >
-            {appSettings.theme === 'light' ? 'Dark' : 'Light'}
-          </button>
           {canUndo && filePath && (
             <button type="button" className="btn btn-secondary" onClick={handleUndo} disabled={loading}>
               Undo Last Write
@@ -787,16 +799,26 @@ function App() {
             <form onSubmit={handleSaveSettings}>
               <fieldset className="settings-section">
                 <legend>Appearance</legend>
-                <label className="settings-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={appSettings.theme === 'light'}
+                <label className="theme-select-label">
+                  Theme
+                  <select
+                    className="theme-select"
+                    value={appSettings.theme}
                     onChange={(e) =>
-                      setAppSettings((s) => ({ ...s, theme: e.target.checked ? 'light' : 'dark' }))
+                      setAppSettings((s) => ({ ...s, theme: normalizeThemeMode(e.target.value) }))
                     }
-                  />
-                  <span>Light theme (off = dark theme)</span>
+                    aria-label="Theme"
+                  >
+                    {THEME_OPTIONS.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
+                {appSettings.theme === 'system' && (
+                  <p className="theme-select-hint">Follow your device light/dark setting</p>
+                )}
               </fieldset>
 
               <fieldset className="settings-section">

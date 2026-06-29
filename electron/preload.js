@@ -14,6 +14,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveApiConfig: (config) => ipcRenderer.invoke('metadata:saveConfig', config),
   getAppSettings: () => ipcRenderer.invoke('settings:get'),
   saveAppSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
+  getSystemTheme: () => ipcRenderer.invoke('theme:getSystem'),
+  onSystemThemeChanged: (callback) => {
+    const listener = (_event, theme) => callback(theme)
+    ipcRenderer.on('theme:systemChanged', listener)
+    return () => ipcRenderer.removeListener('theme:systemChanged', listener)
+  },
   getLogInfo: () => ipcRenderer.invoke('logs:getInfo'),
   openLogFolder: () => ipcRenderer.invoke('logs:openFolder'),
 })

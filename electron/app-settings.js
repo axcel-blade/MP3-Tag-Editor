@@ -3,6 +3,12 @@ import path from 'node:path'
 import { app } from 'electron'
 import { DEFAULT_RENAME_TEMPLATE } from '../shared/rename-template.js'
 
+const VALID_THEMES = new Set(['system', 'dark', 'light'])
+
+function normalizeTheme(value) {
+  return VALID_THEMES.has(value) ? value : 'system'
+}
+
 function settingsPath() {
   return path.join(app.getPath('userData'), 'app-settings.json')
 }
@@ -15,13 +21,13 @@ export async function getAppSettings() {
     return {
       autoRenameEnabled: Boolean(saved.autoRenameEnabled),
       renameTemplate: saved.renameTemplate?.trim() || DEFAULT_RENAME_TEMPLATE,
-      theme: saved.theme === 'light' ? 'light' : 'dark',
+      theme: normalizeTheme(saved.theme),
     }
   } catch {
     return {
       autoRenameEnabled: false,
       renameTemplate: DEFAULT_RENAME_TEMPLATE,
-      theme: 'dark',
+      theme: 'system',
     }
   }
 }
@@ -33,7 +39,7 @@ export async function saveAppSettings(settings) {
       {
         autoRenameEnabled: Boolean(settings.autoRenameEnabled),
         renameTemplate: settings.renameTemplate?.trim() || DEFAULT_RENAME_TEMPLATE,
-        theme: settings.theme === 'light' ? 'light' : 'dark',
+        theme: normalizeTheme(settings.theme),
       },
       null,
       2,

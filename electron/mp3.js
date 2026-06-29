@@ -1,4 +1,3 @@
-import { parseFile } from 'music-metadata'
 import NodeID3 from 'node-id3'
 
 /** ID3 text fields exposed in the UI and write path. */
@@ -18,12 +17,6 @@ function normalizeMime(format) {
   return `image/${format}`
 }
 
-function extractLyrics(common) {
-  const entry = common.lyrics?.[0]
-  if (!entry?.text) return ''
-  return entry.text.trim()
-}
-
 function pictureFromNodeId3(id3) {
   const image = id3?.image
   if (!image?.imageBuffer) return null
@@ -33,44 +26,27 @@ function pictureFromNodeId3(id3) {
   }
 }
 
-/** Merge music-metadata and node-id3 readings into a single tag object for the UI. */
-function normalizeTags(metadata, id3Tags = null) {
-  const common = metadata.common ?? {}
-  let picture = common.picture?.[0]
-    ? {
-        mime: normalizeMime(common.picture[0].format),
-        data: toBase64(common.picture[0].data),
-      }
-    : null
-
-  let lyrics = extractLyrics(common)
-  if (!lyrics && id3Tags?.unsynchronisedLyrics?.text) {
-    lyrics = id3Tags.unsynchronisedLyrics.text.trim()
-  }
-  if (!picture) {
-    picture = pictureFromNodeId3(id3Tags)
-  }
-
+/** Normalize node-id3 tag object for the UI. */
+function normalizeTags(filePath, id3Tags = {}) {
   return {
-    title: common.title ?? id3Tags?.title ?? '',
-    artist: common.artist ?? id3Tags?.artist ?? '',
-    album: common.album ?? id3Tags?.album ?? '',
-    year: common.year ? String(common.year) : id3Tags?.year ?? '',
-    genre: common.genre?.[0] ?? id3Tags?.genre ?? '',
-    trackNumber: common.track?.no ? String(common.track.no) : id3Tags?.trackNumber ?? '',
-    albumArtist: common.albumartist ?? id3Tags?.performerInfo ?? '',
-    lyrics,
-    picture,
-    filePath: metadata.path ?? '',
-    fileName: metadata.path?.split(/[/\\]/).pop() ?? '',
+    title: id3Tags.title ?? '',
+    artist: id3Tags.artist ?? '',
+    album: id3Tags.album ?? '',
+    year: id3Tags.year ?? '',
+    genre: id3Tags.genre ?? '',
+    trackNumber: id3Tags.trackNumber ?? '',
+    albumArtist: id3Tags.performerInfo ?? '',
+    lyrics: id3Tags.unsynchronisedLyrics?.text?.trim() ?? '',
+    picture: pictureFromNodeId3(id3Tags),
+    filePath,
+    fileName: filePath.split(/[/\\]/).pop() ?? '',
   }
 }
 
 /** Read all supported tags (including embedded cover and USLT lyrics) from an MP3 file. */
 export async function readMp3Tags(filePath) {
-  const metadata = await parseFile(filePath)
   const id3Tags = NodeID3.read(filePath) ?? {}
-  return normalizeTags({ ...metadata, path: filePath }, id3Tags)
+  return normalizeTags(filePath, id3Tags)
 }
 
 function assertWriteResult(result) {

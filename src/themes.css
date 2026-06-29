@@ -1,4 +1,4 @@
-/* Theme tokens — dark is default; toggle sets data-theme on <html>. */
+/* Theme tokens — applied via data-theme on <html> (dark, light, or resolved from system). */
 :root,
 [data-theme='dark'] {
   color-scheme: dark;

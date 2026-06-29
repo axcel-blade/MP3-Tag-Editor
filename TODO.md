@@ -21,7 +21,7 @@ Track active and upcoming work items. See [ROADMAP.md](ROADMAP.md) for longer-te
 - [x] Auto file rename with custom template (Settings, off by default)
 - [ ] Batch apply tags across folder selection
 - [x] Drag-and-drop MP3 files onto window
-- [x] Dark/light theme toggle
+- [x] Dark/light theme (Settings: System / Dark / Light)
 - [ ] Export tag report (CSV/JSON)
 
 ## Done (1.1.0)

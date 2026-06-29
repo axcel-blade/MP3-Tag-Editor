@@ -7,19 +7,27 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const electronDir = path.join(__dirname, '..', 'node_modules', 'electron')
 const pathFile = path.join(electronDir, 'path.txt')
 const distDir = path.join(electronDir, 'dist')
-const electronExe = path.join(distDir, 'electron.exe')
 
-if (fs.existsSync(pathFile) && fs.existsSync(electronExe)) {
+function isElectronInstalled() {
+  if (!fs.existsSync(pathFile)) return false
+
+  const binaryName = fs.readFileSync(pathFile, 'utf-8').trim()
+  if (!binaryName) return false
+
+  return fs.existsSync(path.join(distDir, binaryName))
+}
+
+if (isElectronInstalled()) {
   process.exit(0)
 }
 
 try {
   execSync('node install.js', { cwd: electronDir, stdio: 'inherit' })
 } catch {
-  // install.js may fail on some Windows setups; try manual extraction
+  // install.js may fail on some setups; try platform-specific fallback below
 }
 
-if (fs.existsSync(pathFile) && fs.existsSync(electronExe)) {
+if (isElectronInstalled()) {
   process.exit(0)
 }
 

@@ -839,6 +839,21 @@
   border-color: #1db954;
 }
 
+.modal-settings select {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.modal-settings select:focus {
+  outline: none;
+  border-color: #1db954;
+}
+
 .modal-settings input:disabled {
   opacity: 0.55;
 }
@@ -867,6 +882,21 @@
   width: 16px;
   height: 16px;
   accent-color: #1db954;
+}
+
+.theme-select-label {
+  margin-bottom: 0.35rem !important;
+}
+
+.theme-select {
+  width: 100%;
+}
+
+.theme-select-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  line-height: 1.45;
 }
 
 .settings-hint {
