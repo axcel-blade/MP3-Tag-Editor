@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. Version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] - 2026-06-29
+
+### Fixed
+
+- Linux `.deb` build: author email and maintainer for electron-builder
+- Release builds no longer auto-publish to GitHub (workflow uploads installers instead)
+
 ## [1.3.0] - 2026-06-29
 
 ### Added
@@ -57,6 +64,7 @@ All notable changes to this project are documented here. Version numbers follow 
 
 - Initial Python-based MP3 tag editor with Spotify lookup
 
+[1.3.1]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.0.0...v1.1.0
