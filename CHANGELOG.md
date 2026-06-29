@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. Version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [1.3.4] - 2026-06-29
+
+### Added
+
+- Manual tag editing in the Current Tags panel (Edit tags / Save tags / Cancel)
+
+### Fixed
+
+- Backup before write uses resolved paths and UUID backup filenames
+- Auto-rename returns the correct new path after tag write
+- UI stays in sync when a file is renamed after save or undo
+
 ## [1.3.3] - 2026-06-29
 
 ### Fixed
@@ -76,6 +88,7 @@ All notable changes to this project are documented here. Version numbers follow 
 
 - Initial Python-based MP3 tag editor with Spotify lookup
 
+[1.3.4]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.3.0...v1.3.1

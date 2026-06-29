@@ -1,6 +1,6 @@
 # MP3 Tag Editor
 
-[![Version](https://img.shields.io/badge/version-1.3.3-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.4-blue.svg)](CHANGELOG.md)
 [![CI](https://github.com/axcel-blade/MP3-Tag-Editor/actions/workflows/ci.yml/badge.svg)](https://github.com/axcel-blade/MP3-Tag-Editor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -13,6 +13,7 @@ Electron desktop app that reads MP3 ID3 tags, searches multiple metadata APIs in
 - Search MusicBrainz, iTunes, Deezer, Musixmatch, Last.fm, and Spotify
 - Filter results by source; choose which providers to query
 - Apply tags field-by-field via a modal popup
+- Edit tags manually in the Current Tags panel
 - Replace embedded album artwork when **Album Artwork** is checked
 - Optional lyrics embedding (Musixmatch)
 
