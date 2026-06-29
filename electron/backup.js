@@ -1,16 +1,25 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { app } from 'electron'
 
-/** In-memory map of current file path → { backupPath, pathBeforeRename }. */
-const lastBackups = new Map()
+let resolveBackupsRoot = null
+
+/** Register how to resolve the backup folder (Electron main sets this on app ready). */
+export function configureBackupsRoot(resolver) {
+  resolveBackupsRoot = resolver
+}
 
 function backupsRoot() {
   if (process.env.MP3_BACKUP_DIR) {
     return process.env.MP3_BACKUP_DIR
   }
-  return path.join(app.getPath('userData'), 'backups')
+  if (!resolveBackupsRoot) {
+    throw new Error('Backup storage is not configured')
+  }
+  return resolveBackupsRoot()
 }
+
+/** In-memory map of current file path → { backupPath, pathBeforeRename }. */
+const lastBackups = new Map()
 
 /**
  * Copy an MP3 to userData/backups before tag writes so the user can undo.

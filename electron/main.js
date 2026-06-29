@@ -5,7 +5,7 @@ import dotenv from 'dotenv'
 import { APP_DISPLAY_NAME, APP_VERSION } from './constants.js'
 import { initLogger, logger, getLogDirectory, getCurrentLogPath } from './logger.js'
 import { readMp3Tags, writeMp3Tags } from './mp3.js'
-import { backupMp3File, restoreMp3Backup, clearBackup, transferBackup } from './backup.js'
+import { backupMp3File, restoreMp3Backup, clearBackup, transferBackup, configureBackupsRoot } from './backup.js'
 import { getAppSettings, saveAppSettings } from './app-settings.js'
 import { renameMp3File } from './rename.js'
 import { findMp3Files } from './files.js'
@@ -44,6 +44,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  configureBackupsRoot(() => path.join(app.getPath('userData'), 'backups'))
   await initLogger()
   logger.info('Application started', { platform: process.platform, version: APP_VERSION })
 
