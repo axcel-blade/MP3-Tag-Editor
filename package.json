@@ -7,6 +7,9 @@
   "description": "Electron desktop app to read, search, and write MP3 ID3 tags from multiple metadata sources",
   "main": "dist-electron/main.js",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
