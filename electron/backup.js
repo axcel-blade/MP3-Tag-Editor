@@ -1,16 +1,19 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { app } from 'electron'
+import { createRequire } from 'node:module'
 
-/** In-memory map of current file path → { backupPath, pathBeforeRename }. */
-const lastBackups = new Map()
+const require = createRequire(import.meta.url)
 
 function backupsRoot() {
   if (process.env.MP3_BACKUP_DIR) {
     return process.env.MP3_BACKUP_DIR
   }
+  const { app } = require('electron')
   return path.join(app.getPath('userData'), 'backups')
 }
+
+/** In-memory map of current file path → { backupPath, pathBeforeRename }. */
+const lastBackups = new Map()
 
 /**
  * Copy an MP3 to userData/backups before tag writes so the user can undo.
