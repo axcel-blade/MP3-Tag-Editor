@@ -69,9 +69,21 @@ npm run dist:linux  # Linux AppImage + .deb
 
 See [docs/setup.md](docs/setup.md) for details. Optional app icon: place a 256×256 PNG at `build-resources/icon.png`.
 
+## Download installers
+
+Pre-built desktop installers are published on **[GitHub Releases](https://github.com/axcel-blade/MP3-Tag-Editor/releases)**:
+
+| Platform | File |
+|----------|------|
+| Windows | `MP3 Tag Editor Setup *.exe` |
+| macOS | `MP3 Tag Editor *.dmg` |
+| Linux | `MP3 Tag Editor *.AppImage` and `mp3-tag-editor_*_amd64.deb` |
+
+Pick the latest **v1.3.x** release. No Node.js required to run the installed app.
+
 ## Theme
 
-Use the **Light** / **Dark** button in the header, or **Settings → Appearance**.
+Use **Settings → Appearance** to choose **System**, **Dark**, or **Light** theme.
 
 This project follows [Git Flow](CONTRIBUTING.md#git-flow):
 
