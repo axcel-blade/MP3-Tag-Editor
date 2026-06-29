@@ -1,7 +1,17 @@
 /** Default filename pattern when auto-rename is enabled. */
 export const DEFAULT_RENAME_TEMPLATE = '{artist} - {title}'
 
-const INVALID_CHARS = /[<>:"/\\|?*\u0000-\u001f]/g
+const RESERVED_FILENAME_CHARS = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*'])
+
+function removeInvalidFilenameChars(value) {
+  return String(value)
+    .split('')
+    .filter((ch) => {
+      const code = ch.charCodeAt(0)
+      return code >= 32 && !RESERVED_FILENAME_CHARS.has(ch)
+    })
+    .join('')
+}
 
 export function applyRenameTemplate(template, tags, originalBaseName = '') {
   let result = template
@@ -26,8 +36,7 @@ export function applyRenameTemplate(template, tags, originalBaseName = '') {
 }
 
 export function sanitizeFilename(stem) {
-  return stem
-    .replace(INVALID_CHARS, '')
+  return removeInvalidFilenameChars(stem)
     .replace(/\s+/g, ' ')
     .replace(/[.\s]+$/g, '')
     .trim()

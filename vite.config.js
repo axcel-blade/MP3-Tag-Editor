@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron/simple'
 import { builtinModules } from 'node:module'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const nodeBuiltins = [
   'electron',
