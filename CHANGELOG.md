@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. Version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [1.3.7] - 2026-06-29
+
+### Fixed
+
+- Auto-rename no longer fails on Windows when artist/title names create paths longer than 260 characters
+- Tag writes succeed even when auto-rename is skipped; status shows a rename warning
+
 ## [1.3.6] - 2026-06-29
 
 ### Fixed
@@ -107,6 +114,7 @@ All notable changes to this project are documented here. Version numbers follow 
 
 - Initial Python-based MP3 tag editor with Spotify lookup
 
+[1.3.7]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.6...v1.3.7
 [1.3.6]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.5...v1.3.6
 [1.3.5]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.4...v1.3.5
 [1.3.4]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.3.3...v1.3.4
