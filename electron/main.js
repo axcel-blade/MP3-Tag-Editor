@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
@@ -46,6 +46,16 @@ function createWindow() {
 app.whenReady().then(async () => {
   await initLogger()
   logger.info('Application started', { platform: process.platform, version: APP_VERSION })
+
+  nativeTheme.on('updated', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(
+        'theme:systemChanged',
+        nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
+      )
+    }
+  })
+
   createWindow()
 
   app.on('activate', () => {
@@ -188,6 +198,8 @@ ipcMain.handle('settings:save', async (_event, settings) => {
   logger.info('App settings saved')
   return true
 })
+
+ipcMain.handle('theme:getSystem', () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'))
 
 ipcMain.handle('logs:getInfo', async () => ({
   logDir: getLogDirectory(),
