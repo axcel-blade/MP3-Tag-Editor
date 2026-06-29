@@ -799,24 +799,26 @@ function App() {
             <form onSubmit={handleSaveSettings}>
               <fieldset className="settings-section">
                 <legend>Appearance</legend>
-                <p className="modal-desc">Choose a theme or match your device.</p>
-                <div className="theme-options" role="radiogroup" aria-label="Theme">
-                  {THEME_OPTIONS.map(({ value, label, hint }) => (
-                    <label key={value} className="theme-option">
-                      <input
-                        type="radio"
-                        name="theme"
-                        value={value}
-                        checked={appSettings.theme === value}
-                        onChange={() => setAppSettings((s) => ({ ...s, theme: value }))}
-                      />
-                      <span className="theme-option-text">
-                        <span className="theme-option-label">{label}</span>
-                        {hint && <span className="theme-option-hint">{hint}</span>}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                <label className="theme-select-label">
+                  Theme
+                  <select
+                    className="theme-select"
+                    value={appSettings.theme}
+                    onChange={(e) =>
+                      setAppSettings((s) => ({ ...s, theme: normalizeThemeMode(e.target.value) }))
+                    }
+                    aria-label="Theme"
+                  >
+                    {THEME_OPTIONS.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {appSettings.theme === 'system' && (
+                  <p className="theme-select-hint">Follow your device light/dark setting</p>
+                )}
               </fieldset>
 
               <fieldset className="settings-section">
