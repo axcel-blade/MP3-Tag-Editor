@@ -29,6 +29,10 @@ Ensure **Album Artwork** is checked in the Apply Tags modal before clicking **Ap
 
 Run `npm install` again — the postinstall script downloads Electron. See [docs/setup.md](docs/setup.md).
 
+### Log files
+
+MP3 Tag Editor writes daily logs to your Electron user data folder under `logs/` (e.g. `MP3 Tag Editor-2026-06-29.log`). Open **Settings → Logs → Open Log Folder** in the app.
+
 ## Bug reports
 
 Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.md) and include:

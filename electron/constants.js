@@ -3,7 +3,10 @@ import pkg from '../package.json' with { type: 'json' }
 /** Application semver — keep in sync with package.json version field. */
 export const APP_VERSION = pkg.version
 
-/** Short name used in MusicBrainz User-Agent strings. */
+/** Human-readable application name shown in the UI and window title. */
+export const APP_DISPLAY_NAME = 'MP3 Tag Editor'
+
+/** Compact name used in MusicBrainz User-Agent strings. */
 export const APP_NAME = 'MP3TagEditor'
 
 /** Default MusicBrainz User-Agent when none is configured in .env. */

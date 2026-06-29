@@ -1,6 +1,17 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { buildRenameFilename, DEFAULT_RENAME_TEMPLATE, RENAME_PLACEHOLDERS } from '@shared/rename-template.js'
 import './App.css'
+
+const SAMPLE_TAGS_FOR_PREVIEW = {
+  artist: 'Artist Name',
+  title: 'Song Title',
+  album: 'Album Name',
+  year: '2024',
+  genre: 'Pop',
+  trackNumber: '03',
+  albumArtist: 'Artist Name',
+}
 
 /** Supported ID3 text fields shown in Current Tags and the Apply Tags modal. */
 const TAG_FIELDS = [
@@ -95,7 +106,10 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
+  const [canUndo, setCanUndo] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [logInfo, setLogInfo] = useState(null)
   const [apiConfig, setApiConfig] = useState({
     musixmatchApiKey: '',
     lastfmApiKey: '',
@@ -103,10 +117,32 @@ function App() {
     spotifyClientSecret: '',
     hasEnvFile: false,
   })
+  const [appSettings, setAppSettings] = useState({
+    autoRenameEnabled: false,
+    renameTemplate: DEFAULT_RENAME_TEMPLATE,
+    theme: 'dark',
+  })
 
   useEffect(() => {
     window.electronAPI?.getApiConfig().then(setApiConfig)
+    window.electronAPI?.getAppSettings().then(setAppSettings)
   }, [])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', appSettings.theme ?? 'dark')
+  }, [appSettings.theme])
+
+  useEffect(() => {
+    if (!showSettings) return
+    window.electronAPI?.getLogInfo().then(setLogInfo)
+  }, [showSettings])
+
+  const toggleTheme = async () => {
+    const nextTheme = appSettings.theme === 'light' ? 'dark' : 'light'
+    const updated = { ...appSettings, theme: nextTheme }
+    setAppSettings(updated)
+    await window.electronAPI?.saveAppSettings(updated)
+  }
 
   const filteredResults = useMemo(() => {
     if (sourceFilter === 'All') return metadataResults
@@ -164,6 +200,7 @@ function App() {
   const loadFile = useCallback(async (path) => {
     setError('')
     resetSelection()
+    setCanUndo(false)
     setMetadataResults([])
     setProviderErrors([])
     setFilePath(path)
@@ -290,14 +327,22 @@ function App() {
     setLoading(true)
     setError('')
     try {
-      const updated = await window.electronAPI.writeMp3Tags(
+      const result = await window.electronAPI.writeMp3Tags(
         filePath,
         fieldsToWrite,
         includeArtwork && selectedTrack.artworkUrl,
         selectedTrack.artworkUrl,
       )
-      setCurrentTags(updated)
-      setStatus(`Tags saved: ${updated.fileName}`)
+      setCurrentTags(result.tags)
+      setCanUndo(true)
+
+      if (result.filePath && result.filePath !== filePath) {
+        setFilePath(result.filePath)
+        setFilePaths((prev) => prev.map((p) => (p === filePath ? result.filePath : p)))
+        setStatus(`Tags saved and renamed to ${result.tags.fileName} (Undo available)`)
+      } else {
+        setStatus(`Tags saved: ${result.tags.fileName} (backup created — Undo available)`)
+      }
       resetSelection()
     } catch (err) {
       setError(err.message)
@@ -306,23 +351,115 @@ function App() {
     }
   }
 
+  /** Restore the pre-write backup for the current file. */
+  const handleUndo = async () => {
+    if (!filePath || !canUndo) return
+    setLoading(true)
+    setError('')
+    try {
+      const restored = await window.electronAPI.undoMp3Write(filePath)
+      setCurrentTags(restored)
+      if (restored.filePath && restored.filePath !== filePath) {
+        setFilePath(restored.filePath)
+        setFilePaths((prev) => prev.map((p) => (p === filePath ? restored.filePath : p)))
+      }
+      setCanUndo(false)
+      resetSelection()
+      setStatus(`Reverted to backup: ${restored.fileName}`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /** Open dropped MP3 file(s) from the desktop (Electron exposes file.path). */
+  const handleDrop = useCallback(async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const paths = [...e.dataTransfer.files]
+      .map((file) => file.path)
+      .filter((p) => p && p.toLowerCase().endsWith('.mp3'))
+
+    if (paths.length === 0) {
+      setError('Drop one or more .mp3 files')
+      return
+    }
+
+    setError('')
+    setStatus('')
+    resetSelection()
+    setMetadataResults([])
+    setProviderErrors([])
+    setCanUndo(false)
+    setFolderPath(null)
+    setFilePaths(paths)
+
+    if (paths.length > 1) {
+      setStatus(`Loaded ${paths.length} dropped MP3 files`)
+    }
+
+    await loadFile(paths[0])
+  }, [loadFile, resetSelection])
+
   const handleSaveSettings = async (e) => {
     e.preventDefault()
-    await window.electronAPI.saveApiConfig(apiConfig)
+    await window.electronAPI.saveAppSettings(appSettings)
+    if (!apiConfig.hasEnvFile) {
+      await window.electronAPI.saveApiConfig(apiConfig)
+    }
     setShowSettings(false)
-    setStatus('API settings saved.')
+    setStatus('Settings saved.')
   }
+
+  const renamePreview = useMemo(() => {
+    const sampleBase = currentTags?.fileName
+      ? currentTags.fileName.replace(/\.mp3$/i, '')
+      : 'song'
+    return buildRenameFilename(appSettings.renameTemplate, currentTags ?? SAMPLE_TAGS_FOR_PREVIEW, sampleBase)
+  }, [appSettings.renameTemplate, currentTags])
 
   const showFileList = filePaths.length > 1
 
   return (
-    <div className="app">
+    <div
+      className={`app ${isDragging ? 'app-dragging' : ''}`}
+      onDragEnter={(e) => {
+        e.preventDefault()
+        setIsDragging(true)
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setIsDragging(false)
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="drop-overlay" aria-hidden="true">
+          <p>Drop MP3 files here</p>
+        </div>
+      )}
       <header className="header">
         <div className="header-left">
           <h1>MP3 Tag Editor</h1>
           <p className="subtitle">Musixmatch · MusicBrainz · Last.fm · iTunes · Spotify · Deezer</p>
         </div>
         <div className="header-actions">
+          <button
+            type="button"
+            className="btn btn-secondary theme-toggle"
+            onClick={toggleTheme}
+            title={appSettings.theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          >
+            {appSettings.theme === 'light' ? 'Dark' : 'Light'}
+          </button>
+          {canUndo && filePath && (
+            <button type="button" className="btn btn-secondary" onClick={handleUndo} disabled={loading}>
+              Undo Last Write
+            </button>
+          )}
           <button type="button" className="btn btn-secondary" onClick={() => setShowSettings(true)}>
             Settings
           </button>
@@ -381,7 +518,7 @@ function App() {
           <section className="panel current-tags">
             <h2>Current Tags</h2>
             {!currentTags ? (
-              <p className="placeholder">Open an MP3 file or folder to view metadata</p>
+              <p className="placeholder">Open an MP3 file, folder, or drag &amp; drop files here</p>
             ) : (
               <div className="tags-grid">
                 {currentTags.picture?.data ? (
@@ -639,15 +776,68 @@ function App() {
         createPortal(
           <div className="modal-overlay" onClick={() => setShowSettings(false)} role="presentation">
             <div className="modal-settings" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-            <h2>API Settings</h2>
+            <h2>Settings</h2>
             <p className="modal-desc">
               MusicBrainz, iTunes, and Deezer work without keys. Optional keys go in <code>.env</code> or below.
             </p>
             {apiConfig.hasEnvFile && (
-              <p className="modal-note">Using credentials from .env (Settings values are ignored while .env is set).</p>
+              <p className="modal-note">Using credentials from .env (API key fields are ignored while .env is set).</p>
             )}
 
             <form onSubmit={handleSaveSettings}>
+              <fieldset className="settings-section">
+                <legend>Appearance</legend>
+                <label className="settings-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={appSettings.theme === 'light'}
+                    onChange={(e) =>
+                      setAppSettings((s) => ({ ...s, theme: e.target.checked ? 'light' : 'dark' }))
+                    }
+                  />
+                  <span>Light theme (off = dark theme)</span>
+                </label>
+              </fieldset>
+
+              <fieldset className="settings-section">
+                <legend>Auto file rename</legend>
+                <p className="modal-desc">
+                  After applying tags, rename the MP3 using a custom template. Off by default.
+                </p>
+                <label className="settings-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={appSettings.autoRenameEnabled}
+                    onChange={(e) =>
+                      setAppSettings((s) => ({ ...s, autoRenameEnabled: e.target.checked }))
+                    }
+                  />
+                  <span>Rename file after applying tags</span>
+                </label>
+                <label>
+                  Filename template
+                  <input
+                    type="text"
+                    value={appSettings.renameTemplate}
+                    onChange={(e) =>
+                      setAppSettings((s) => ({ ...s, renameTemplate: e.target.value }))
+                    }
+                    placeholder="{artist} - {title}"
+                    disabled={!appSettings.autoRenameEnabled}
+                  />
+                </label>
+                <p className="settings-hint">
+                  Placeholders: {RENAME_PLACEHOLDERS.join(', ')}
+                </p>
+                {appSettings.autoRenameEnabled && (
+                  <p className="modal-note rename-preview">
+                    Preview: <code>{renamePreview}</code>
+                  </p>
+                )}
+              </fieldset>
+
+              <fieldset className="settings-section">
+                <legend>API keys</legend>
               <label>
                 Musixmatch API Key
                 <input
@@ -699,11 +889,32 @@ function App() {
                 {' · '}
                 Spotify: <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">developer.spotify.com</a> (Premium required)
               </p>
+              </fieldset>
+
+              <fieldset className="settings-section">
+                <legend>Logs</legend>
+                <p className="modal-desc">
+                  MP3 Tag Editor writes daily log files for tag reads, writes, searches, and errors.
+                </p>
+                {logInfo?.currentLog && (
+                  <p className="settings-hint log-path">
+                    Current: <code>{logInfo.currentLog}</code>
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary settings-log-btn"
+                  onClick={() => window.electronAPI?.openLogFolder()}
+                >
+                  Open Log Folder
+                </button>
+              </fieldset>
+
               <div className="modal-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowSettings(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={apiConfig.hasEnvFile}>
+                <button type="submit" className="btn btn-primary">
                   Save
                 </button>
               </div>

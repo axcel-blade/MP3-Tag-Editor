@@ -10,16 +10,17 @@ Track active and upcoming work items. See [ROADMAP.md](ROADMAP.md) for longer-te
 - [x] Album artwork embed/replace
 - [x] Musixmatch lyrics support
 - [x] Git Flow branches and project documentation
-- [ ] Packaged installers (Windows/macOS/Linux via electron-builder)
-- [ ] Unit tests for `electron/mp3.js` read/write
+- [x] Packaged installers (Windows/macOS/Linux via electron-builder)
+- [x] Unit tests for `electron/mp3.js` read/write
 - [ ] Provider integration tests (mocked HTTP)
 
 ## Backlog
 
-- [ ] Undo / backup before write
+- [x] Undo / backup before write
+- [x] Auto file rename with custom template (Settings, off by default)
 - [ ] Batch apply tags across folder selection
-- [ ] Drag-and-drop MP3 files onto window
-- [ ] Dark/light theme toggle
+- [x] Drag-and-drop MP3 files onto window
+- [x] Dark/light theme toggle
 - [ ] Export tag report (CSV/JSON)
 
 ## Done (1.1.0)

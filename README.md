@@ -1,7 +1,7 @@
 # MP3 Tag Editor
 
 [![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Electron desktop app that reads MP3 ID3 tags, searches multiple metadata APIs in parallel, and lets you selectively apply tags—including lyrics and album artwork—back to your files.
 
@@ -58,7 +58,19 @@ docs/               Extended documentation
 .github/            Issue and PR templates
 ```
 
-## Development
+## Building installers (v1.2.0+)
+
+```bash
+npm run dist:win    # Windows .exe installer → release/
+npm run dist:mac    # macOS .dmg (on Mac)
+npm run dist:linux  # Linux AppImage + .deb
+```
+
+See [docs/setup.md](docs/setup.md) for details. Optional app icon: place a 256×256 PNG at `build-resources/icon.png`.
+
+## Theme
+
+Use the **Light** / **Dark** button in the header, or **Settings → Appearance**.
 
 This project follows [Git Flow](CONTRIBUTING.md#git-flow):
 
@@ -89,4 +101,4 @@ npm run lint     # ESLint
 
 ## License
 
-[MIT](LICENSE.md) — see [LICENSE.md](LICENSE.md) for details.
+[MIT](LICENSE) — Copyright © 2026 Axcel Blade

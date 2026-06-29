@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron/simple'
 import { builtinModules } from 'node:module'
+import path from 'node:path'
 
 const nodeBuiltins = [
   'electron',
@@ -14,6 +15,11 @@ const nodeBuiltins = [
 
 // Node-only modules must stay external so Electron loads them at runtime.
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@shared': path.resolve(__dirname, 'shared'),
+    },
+  },
   plugins: [
     react(),
     electron({

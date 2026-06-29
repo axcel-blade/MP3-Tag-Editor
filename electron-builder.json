@@ -1,0 +1,30 @@
+{
+  "appId": "com.axcelblade.mp3tageditor",
+  "productName": "MP3 Tag Editor",
+  "copyright": "Copyright © 2026 Axcel Blade",
+  "directories": {
+    "output": "release",
+    "buildResources": "build-resources"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*",
+    "package.json"
+  ],
+  "asar": true,
+  "win": {
+    "target": ["nsis"]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  },
+  "mac": {
+    "target": ["dmg"],
+    "category": "public.app-category.music"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "category": "Audio"
+  }
+}

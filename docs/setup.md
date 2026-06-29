@@ -59,6 +59,28 @@ Output:
 npm run lint
 ```
 
+## Building installers
+
+Package the app for distribution with [electron-builder](https://www.electron.build/):
+
+```bash
+# Current platform
+npm run dist
+
+# Windows (.exe NSIS installer) — run on Windows
+npm run dist:win
+
+# macOS (.dmg) — run on macOS
+npm run dist:mac
+
+# Linux (AppImage + .deb) — run on Linux
+npm run dist:linux
+```
+
+Output goes to the `release/` folder. End users can install without Node.js or npm.
+
+**Note:** macOS and Linux builds must typically be run on their target OS (or CI). Windows builds work on your current machine.
+
 ## Troubleshooting
 
 ### Electron failed to install

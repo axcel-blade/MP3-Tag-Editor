@@ -1,0 +1,77 @@
+/* Theme tokens — dark is default; toggle sets data-theme on <html>. */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --app-gradient: linear-gradient(160deg, #0f1117 0%, #151922 50%, #0d1018 100%);
+  --bg-base: #0f1117;
+  --bg-panel: #181c24;
+  --bg-elevated: #151922;
+  --bg-input: #0f1117;
+  --bg-deep: #0d1018;
+  --border: #252a35;
+  --border-hover: #3f4654;
+  --text: #e8eaed;
+  --text-secondary: #b4bac8;
+  --text-muted: #8b93a7;
+  --text-dim: #6b7280;
+  --header-bg: rgba(15, 17, 23, 0.9);
+  --overlay-bg: rgba(15, 17, 23, 0.85);
+  --btn-secondary: #252a35;
+  --btn-secondary-hover: #2f3544;
+  --cover-bg: #252a35;
+  --accent-soft: rgba(29, 185, 84, 0.12);
+  --accent-soft-medium: rgba(29, 185, 84, 0.1);
+  --accent-soft-strong: rgba(29, 185, 84, 0.15);
+  --accent-outline: rgba(29, 185, 84, 0.5);
+  --changed-row-bg: rgba(29, 185, 84, 0.06);
+  --apply-modal-border: rgba(29, 185, 84, 0.4);
+  --shadow-modal: 0 28px 80px rgba(0, 0, 0, 0.65);
+  --banner-info-bg: rgba(29, 185, 84, 0.12);
+  --banner-info-border: rgba(29, 185, 84, 0.2);
+  --banner-error-bg: rgba(239, 68, 68, 0.12);
+  --banner-error-border: rgba(239, 68, 68, 0.2);
+  --banner-warn-bg: rgba(245, 158, 11, 0.1);
+  --banner-warn-border: rgba(245, 158, 11, 0.2);
+  --modal-close-bg: #0f1117;
+  --modal-close-hover: #252a35;
+  --sticky-footer-bg: #181c24;
+  --overlay-scrim: rgba(0, 0, 0, 0.78);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --app-gradient: linear-gradient(160deg, #f5f6f8 0%, #eef1f5 50%, #e8ecf2 100%);
+  --bg-base: #f5f6f8;
+  --bg-panel: #ffffff;
+  --bg-elevated: #f0f2f5;
+  --bg-input: #ffffff;
+  --bg-deep: #e8ecf2;
+  --border: #d8dce3;
+  --border-hover: #b8bec8;
+  --text: #1a1d24;
+  --text-secondary: #3d4451;
+  --text-muted: #5c6370;
+  --text-dim: #8b919a;
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --overlay-bg: rgba(245, 246, 248, 0.88);
+  --btn-secondary: #e2e5eb;
+  --btn-secondary-hover: #d0d4dc;
+  --cover-bg: #e2e5eb;
+  --accent-soft: rgba(29, 185, 84, 0.14);
+  --accent-soft-medium: rgba(29, 185, 84, 0.12);
+  --accent-soft-strong: rgba(29, 185, 84, 0.18);
+  --accent-outline: rgba(29, 185, 84, 0.45);
+  --changed-row-bg: rgba(29, 185, 84, 0.08);
+  --apply-modal-border: rgba(29, 185, 84, 0.35);
+  --shadow-modal: 0 28px 80px rgba(0, 0, 0, 0.12);
+  --banner-info-bg: rgba(29, 185, 84, 0.14);
+  --banner-info-border: rgba(29, 185, 84, 0.25);
+  --banner-error-bg: rgba(239, 68, 68, 0.1);
+  --banner-error-border: rgba(239, 68, 68, 0.22);
+  --banner-warn-bg: rgba(245, 158, 11, 0.12);
+  --banner-warn-border: rgba(245, 158, 11, 0.25);
+  --modal-close-bg: #f0f2f5;
+  --modal-close-hover: #e2e5eb;
+  --sticky-footer-bg: #ffffff;
+  --overlay-scrim: rgba(0, 0, 0, 0.45);
+}

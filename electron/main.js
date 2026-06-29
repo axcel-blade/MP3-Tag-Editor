@@ -1,9 +1,13 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
-import { APP_VERSION } from './constants.js'
+import { APP_DISPLAY_NAME, APP_VERSION } from './constants.js'
+import { initLogger, logger, getLogDirectory, getCurrentLogPath } from './logger.js'
 import { readMp3Tags, writeMp3Tags } from './mp3.js'
+import { backupMp3File, restoreMp3Backup, clearBackup, transferBackup } from './backup.js'
+import { getAppSettings, saveAppSettings } from './app-settings.js'
+import { renameMp3File } from './rename.js'
 import { findMp3Files } from './files.js'
 import { searchAllMetadata } from './metadata/search.js'
 import { getApiConfig, saveApiConfig } from './metadata/config.js'
@@ -24,7 +28,7 @@ function createWindow() {
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    title: `MP3 Tag Editor v${APP_VERSION}`,
+    title: `${APP_DISPLAY_NAME} v${APP_VERSION}`,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
@@ -39,7 +43,9 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await initLogger()
+  logger.info('Application started', { platform: process.platform, version: APP_VERSION })
   createWindow()
 
   app.on('activate', () => {
@@ -79,18 +85,22 @@ ipcMain.handle('dialog:openFolder', async () => {
 
 ipcMain.handle('metadata:search', async (_event, tags, providers) => {
   try {
-    return await searchAllMetadata(tags, providers)
+    const result = await searchAllMetadata(tags, providers)
+    logger.info('Metadata search completed', { query: result.query, count: result.results.length })
+    return result
   } catch (err) {
-    console.error('metadata:search error:', err)
+    logger.error('metadata:search failed', { error: err.message })
     throw err
   }
 })
 
 ipcMain.handle('metadata:searchCustom', async (_event, query, providers) => {
   try {
-    return await searchAllMetadata(query, providers)
+    const result = await searchAllMetadata(query, providers)
+    logger.info('Custom metadata search completed', { query: result.query, count: result.results.length })
+    return result
   } catch (err) {
-    console.error('metadata:searchCustom error:', err)
+    logger.error('metadata:searchCustom failed', { error: err.message })
     throw err
   }
 })
@@ -99,18 +109,53 @@ ipcMain.handle('metadata:searchCustom', async (_event, query, providers) => {
 
 ipcMain.handle('mp3:readTags', async (_event, filePath) => {
   try {
-    return await readMp3Tags(filePath)
+    const tags = await readMp3Tags(filePath)
+    logger.info('Read MP3 tags', { file: path.basename(filePath) })
+    return tags
   } catch (err) {
-    console.error('mp3:readTags error:', err)
+    logger.error('mp3:readTags failed', { file: filePath, error: err.message })
     throw err
   }
 })
 
 ipcMain.handle('mp3:writeTags', async (_event, filePath, fields, includeArtwork, artworkUrl) => {
   try {
-    return await writeMp3Tags(filePath, fields, includeArtwork, artworkUrl)
+    const backupPath = await backupMp3File(filePath)
+    let tags = await writeMp3Tags(filePath, fields, includeArtwork, artworkUrl)
+    let finalPath = filePath
+
+    const settings = await getAppSettings()
+    if (settings.autoRenameEnabled) {
+      const renamedPath = await renameMp3File(filePath, tags, settings.renameTemplate)
+      if (renamedPath !== filePath) {
+        transferBackup(filePath, renamedPath)
+        finalPath = renamedPath
+        tags = await readMp3Tags(finalPath)
+        logger.info('File renamed after tag write', { from: path.basename(filePath), to: path.basename(finalPath) })
+      }
+    }
+
+    logger.info('Wrote MP3 tags', {
+      file: path.basename(finalPath),
+      fields: Object.keys(fields),
+      artwork: includeArtwork,
+      renamed: finalPath !== filePath,
+    })
+    return { tags, backupPath, filePath: finalPath, renamed: finalPath !== filePath }
   } catch (err) {
-    console.error('mp3:writeTags error:', err)
+    logger.error('mp3:writeTags failed', { file: filePath, error: err.message })
+    throw err
+  }
+})
+
+ipcMain.handle('mp3:undoWrite', async (_event, filePath) => {
+  try {
+    const restoredPath = await restoreMp3Backup(filePath)
+    clearBackup(restoredPath)
+    logger.info('Undid tag write', { file: path.basename(restoredPath) })
+    return readMp3Tags(restoredPath)
+  } catch (err) {
+    logger.error('mp3:undoWrite failed', { file: filePath, error: err.message })
     throw err
   }
 })
@@ -132,4 +177,25 @@ ipcMain.handle('metadata:getConfig', async () => {
 ipcMain.handle('metadata:saveConfig', async (_event, config) => {
   await saveApiConfig(config)
   return true
+})
+
+// --- App preferences (rename template, etc.) ---
+
+ipcMain.handle('settings:get', async () => getAppSettings())
+
+ipcMain.handle('settings:save', async (_event, settings) => {
+  await saveAppSettings(settings)
+  logger.info('App settings saved')
+  return true
+})
+
+ipcMain.handle('logs:getInfo', async () => ({
+  logDir: getLogDirectory(),
+  currentLog: getCurrentLogPath(),
+}))
+
+ipcMain.handle('logs:openFolder', async () => {
+  const dir = getLogDirectory()
+  if (dir) await shell.openPath(dir)
+  return dir
 })

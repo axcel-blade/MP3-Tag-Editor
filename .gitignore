@@ -1,5 +1,5 @@
-# Logs
-logs
+# Logs (npm, dev tools, and local app output)
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -13,6 +13,7 @@ dist-ssr
 *.local
 .env
 dist-electron
+release
 
 # Editor directories and files
 .vscode/*
