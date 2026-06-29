@@ -1,10 +1,16 @@
 import { createRequire } from 'node:module'
 import { app } from 'electron'
 import { logger } from './logger.js'
+import {
+  GITHUB_OWNER,
+  GITHUB_REPO,
+  GITHUB_RELEASES_URL,
+  GITHUB_UPDATE_FEED_URL,
+} from './constants.js'
 
 const require = createRequire(import.meta.url)
 
-const RELEASE_PAGE = 'https://github.com/axcel-blade/MP3-Tag-Editor/releases/latest'
+const RELEASE_PAGE = GITHUB_RELEASES_URL
 
 let getMainWindow = () => null
 let autoUpdater = null
@@ -14,6 +20,19 @@ function resolveAutoUpdater() {
     autoUpdater = require('electron-updater').autoUpdater
   }
   return autoUpdater
+}
+
+/** Override baked-in app-update.yml (fixes wrong repo slug in older installers). */
+function configureUpdaterFeed(updater) {
+  updater.setFeedURL({
+    provider: 'generic',
+    url: GITHUB_UPDATE_FEED_URL,
+  })
+  logger.info('Configured update feed', {
+    owner: GITHUB_OWNER,
+    repo: GITHUB_REPO,
+    url: GITHUB_UPDATE_FEED_URL,
+  })
 }
 
 function sendUpdateStatus(payload) {
@@ -32,12 +51,20 @@ function pickUpdateInfo(info) {
   }
 }
 
+function handleUpdateError(err) {
+  const message = err?.message ?? String(err)
+  logger.error('Application update failed', { error: message })
+  sendUpdateStatus({ status: 'error', message, releasePage: RELEASE_PAGE })
+  return message
+}
+
 /** Wire auto-updater events and optional startup check (packaged app only). */
 export function initAutoUpdater(resolveMainWindow) {
   if (!app.isPackaged) return
 
   getMainWindow = resolveMainWindow
   const updater = resolveAutoUpdater()
+  configureUpdaterFeed(updater)
   updater.autoDownload = false
   updater.autoInstallOnAppQuit = true
 
@@ -57,8 +84,7 @@ export function initAutoUpdater(resolveMainWindow) {
   })
 
   updater.on('error', (err) => {
-    logger.error('Application update failed', { error: err.message })
-    sendUpdateStatus({ status: 'error', message: err.message, releasePage: RELEASE_PAGE })
+    handleUpdateError(err)
   })
 
   updater.on('download-progress', (progress) => {
@@ -87,8 +113,17 @@ export async function checkForUpdates() {
   if (!app.isPackaged) {
     return { skipped: true, reason: 'dev' }
   }
-  await resolveAutoUpdater().checkForUpdates()
-  return { started: true }
+
+  const updater = resolveAutoUpdater()
+  configureUpdaterFeed(updater)
+
+  try {
+    await updater.checkForUpdates()
+    return { started: true }
+  } catch (err) {
+    const message = handleUpdateError(err)
+    return { error: message }
+  }
 }
 
 /** Download the available update in the background. */
@@ -96,6 +131,7 @@ export async function downloadUpdate() {
   if (!app.isPackaged) {
     throw new Error('Updates are only available in the installed app')
   }
+  configureUpdaterFeed(resolveAutoUpdater())
   await resolveAutoUpdater().downloadUpdate()
   return true
 }

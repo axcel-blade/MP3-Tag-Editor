@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { renameMp3File } from '../electron/rename.js'
+import { renameMp3File, previewRename } from '../electron/rename.js'
 import {
   applyRenameTemplate,
   buildRenameFilename,
@@ -43,6 +43,20 @@ describe('buildRenameFilename', () => {
   it('falls back to original base when template resolves empty', () => {
     expect(buildRenameFilename('{artist}', {}, 'fallback-name')).toBe('fallback-name.mp3')
   })
+
+  it('includes filename placeholder from the original base name', () => {
+    expect(
+      buildRenameFilename('{filename}', { title: 'Ignored' }, 'original-song'),
+    ).toBe('original-song.mp3')
+  })
+})
+
+describe('previewRename', () => {
+  it('previews the target filename without touching disk', () => {
+    expect(
+      previewRename('{artist} - {title}', { artist: 'A', title: 'B' }, 'old-name.mp3'),
+    ).toBe('A - B.mp3')
+  })
 })
 
 describe('renameMp3File', () => {
@@ -68,5 +82,35 @@ describe('renameMp3File', () => {
 
     expect(renamedPath).toBe(join(tempDir, 'Artist - Title.mp3'))
     await expect(readFile(renamedPath)).resolves.toBeDefined()
+  })
+
+  it('returns the original path when the target name is unchanged', async () => {
+    const sourcePath = join(tempDir, 'Artist - Title.mp3')
+    await writeFile(sourcePath, Buffer.from('mp3'))
+
+    const renamedPath = await renameMp3File(
+      sourcePath,
+      { artist: 'Artist', title: 'Title' },
+      '{artist} - {title}',
+    )
+
+    expect(renamedPath).toBe(sourcePath)
+  })
+
+  it('adds a numeric suffix when the target filename already exists', async () => {
+    const sourcePath = join(tempDir, 'original.mp3')
+    const existingPath = join(tempDir, 'Artist - Title.mp3')
+    await writeFile(sourcePath, Buffer.from('new'))
+    await writeFile(existingPath, Buffer.from('existing'))
+
+    const renamedPath = await renameMp3File(
+      sourcePath,
+      { artist: 'Artist', title: 'Title' },
+      '{artist} - {title}',
+    )
+
+    expect(renamedPath).toBe(join(tempDir, 'Artist - Title (1).mp3'))
+    await expect(readFile(renamedPath)).resolves.toEqual(Buffer.from('new'))
+    await expect(readFile(existingPath)).resolves.toEqual(Buffer.from('existing'))
   })
 })

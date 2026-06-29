@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import NodeID3 from 'node-id3'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readMp3Tags, writeMp3Tags } from '../electron/mp3.js'
 
 /** Create a minimal on-disk MP3 with ID3 tags for read/write tests. */
@@ -46,6 +46,12 @@ describe('readMp3Tags', () => {
     expect(tags.album).toBe('Original Album')
     expect(tags.fileName).toBe('fixture.mp3')
   })
+
+  it('maps album artist from performerInfo', async () => {
+    const filePath = await createFixtureMp3(tempDir, { performerInfo: 'Album Artist Name' })
+    const tags = await readMp3Tags(filePath)
+    expect(tags.albumArtist).toBe('Album Artist Name')
+  })
 })
 
 describe('writeMp3Tags', () => {
@@ -83,5 +89,50 @@ describe('writeMp3Tags', () => {
     )
 
     expect(updated.lyrics).toContain('Line one')
+  })
+
+  it('writes album artist to performerInfo', async () => {
+    const filePath = await createFixtureMp3(tempDir)
+    const updated = await writeMp3Tags(filePath, { albumArtist: 'Various Artists' }, false, null)
+    expect(updated.albumArtist).toBe('Various Artists')
+  })
+
+  it('embeds artwork when includeArtwork is true', async () => {
+    const filePath = await createFixtureMp3(tempDir)
+    const imageBytes = Buffer.from('fake-image-bytes')
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        headers: { get: () => 'image/png' },
+        arrayBuffer: async () => imageBytes.buffer.slice(
+          imageBytes.byteOffset,
+          imageBytes.byteOffset + imageBytes.byteLength,
+        ),
+      })),
+    )
+
+    const updated = await writeMp3Tags(
+      filePath,
+      { title: 'Original Title' },
+      true,
+      'https://example.com/cover.png',
+    )
+
+    expect(updated.picture?.mime).toBe('image/png')
+    expect(updated.picture?.data).toBeTruthy()
+    vi.unstubAllGlobals()
+  })
+
+  it('throws when artwork download fails', async () => {
+    const filePath = await createFixtureMp3(tempDir)
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404 })))
+
+    await expect(
+      writeMp3Tags(filePath, { title: 'Original Title' }, true, 'https://example.com/missing.png'),
+    ).rejects.toThrow(/Failed to download artwork/)
+
+    vi.unstubAllGlobals()
   })
 })

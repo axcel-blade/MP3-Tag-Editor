@@ -564,6 +564,9 @@ function App() {
         setStatus('Update checks run in the installed app only (not dev mode).')
         setUpdateChecking(false)
         manualUpdateCheck.current = false
+      } else if (result?.error) {
+        setUpdateChecking(false)
+        manualUpdateCheck.current = false
       }
     } catch (err) {
       setError(err.message)
@@ -586,7 +589,7 @@ function App() {
   }
 
   const handleOpenReleasePage = async () => {
-    const url = (await window.electronAPI?.getUpdateReleasePage?.()) ?? 'https://github.com/axcel-blade/MP3-Tag-Editor/releases/latest'
+    const url = (await window.electronAPI?.getUpdateReleasePage?.()) ?? 'https://github.com/axcel-blade/mp3-tag-editor/releases/latest'
     window.open(url, '_blank', 'noopener')
   }
 
