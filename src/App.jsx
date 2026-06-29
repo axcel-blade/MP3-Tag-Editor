@@ -382,7 +382,11 @@ function App() {
       } else {
         setCurrentTags(result.tags)
       }
-      setStatus(statusMessage(result.tags.fileName))
+      let message = statusMessage(result.tags.fileName)
+      if (result.renameWarning) {
+        message += ` (Rename skipped: ${result.renameWarning})`
+      }
+      setStatus(message)
     },
     [replaceSelectedFilePath],
   )

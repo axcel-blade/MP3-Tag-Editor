@@ -146,15 +146,24 @@ ipcMain.handle('mp3:writeTags', async (_event, filePath, fields, includeArtwork,
     const backupPath = await backupMp3File(resolvedFilePath)
     let tags = await writeMp3Tags(resolvedFilePath, fields, includeArtwork, artworkUrl)
     let finalPath = resolvedFilePath
+    let renameWarning = null
 
     const settings = await getAppSettings()
     if (settings.autoRenameEnabled) {
-      const renamedPath = await renameMp3File(resolvedFilePath, tags, settings.renameTemplate)
-      if (renamedPath !== resolvedFilePath) {
-        transferBackup(resolvedFilePath, renamedPath)
-        finalPath = renamedPath
-        tags = await readMp3Tags(finalPath)
-        logger.info('File renamed after tag write', { from: path.basename(resolvedFilePath), to: path.basename(finalPath) })
+      try {
+        const renamedPath = await renameMp3File(resolvedFilePath, tags, settings.renameTemplate)
+        if (renamedPath !== resolvedFilePath) {
+          transferBackup(resolvedFilePath, renamedPath)
+          finalPath = renamedPath
+          tags = await readMp3Tags(finalPath)
+          logger.info('File renamed after tag write', { from: path.basename(resolvedFilePath), to: path.basename(finalPath) })
+        }
+      } catch (renameErr) {
+        renameWarning = renameErr.message
+        logger.warn('Auto-rename failed after tag write; tags were saved', {
+          file: path.basename(resolvedFilePath),
+          error: renameErr.message,
+        })
       }
     }
 
@@ -164,7 +173,7 @@ ipcMain.handle('mp3:writeTags', async (_event, filePath, fields, includeArtwork,
       artwork: includeArtwork,
       renamed: finalPath !== resolvedFilePath,
     })
-    return { tags, backupPath, filePath: finalPath, renamed: finalPath !== resolvedFilePath }
+    return { tags, backupPath, filePath: finalPath, renamed: finalPath !== resolvedFilePath, renameWarning }
   } catch (err) {
     logger.error('mp3:writeTags failed', { file: resolvedFilePath, error: err.message })
     throw err
