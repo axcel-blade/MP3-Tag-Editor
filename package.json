@@ -2,11 +2,12 @@
   "name": "mp3-tag-editor",
   "productName": "MP3 Tag Editor",
   "private": true,
-  "version": "1.3.2",
+  "version": "1.3.3",
   "author": {
     "name": "Axcel Blade",
     "email": "56168280+axcel-blade@users.noreply.github.com"
   },
+  "desktopName": "mp3-tag-editor",
   "description": "Electron desktop app to read, search, and write MP3 ID3 tags from multiple metadata sources",
   "main": "dist-electron/main.js",
   "type": "module",
