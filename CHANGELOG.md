@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here. Version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [1.3.5] - 2026-06-29
+
+### Added
+
+- In-app auto-update from GitHub Releases (notification, download, restart to install)
+- Settings → Check for updates
+- Independent scroll for folder file list and metadata search results
+
 ## [1.3.4] - 2026-06-29
 
 ### Added
@@ -88,6 +96,7 @@ All notable changes to this project are documented here. Version numbers follow 
 
 - Initial Python-based MP3 tag editor with Spotify lookup
 
+[1.3.5]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.3.4...v1.3.5
 [1.3.4]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/axcel-blade/MP3-Tag-Editor/compare/v1.3.1...v1.3.2

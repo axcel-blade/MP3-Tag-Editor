@@ -22,4 +22,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   getLogInfo: () => ipcRenderer.invoke('logs:getInfo'),
   openLogFolder: () => ipcRenderer.invoke('logs:openFolder'),
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  getUpdateReleasePage: () => ipcRenderer.invoke('update:getReleasePage'),
+  getAppVersion: () => ipcRenderer.invoke('update:getVersion'),
+  onUpdateStatus: (callback) => {
+    const listener = (_event, payload) => callback(payload)
+    ipcRenderer.on('update:status', listener)
+    return () => ipcRenderer.removeListener('update:status', listener)
+  },
 })

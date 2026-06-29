@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { buildRenameFilename, DEFAULT_RENAME_TEMPLATE, RENAME_PLACEHOLDERS } from '@shared/rename-template.js'
 import { THEME_OPTIONS, applyTheme, normalizeThemeMode } from './theme.js'
@@ -126,6 +126,10 @@ function App() {
     theme: 'system',
   })
   const [systemTheme, setSystemTheme] = useState(null)
+  const [updateInfo, setUpdateInfo] = useState({ status: 'idle' })
+  const [updateChecking, setUpdateChecking] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
+  const manualUpdateCheck = useRef(false)
 
   useEffect(() => {
     window.electronAPI?.getApiConfig().then(setApiConfig)
@@ -136,6 +140,35 @@ function App() {
       })
     })
     window.electronAPI?.getSystemTheme?.().then(setSystemTheme)
+    window.electronAPI?.getAppVersion?.().then((version) => {
+      if (version) setAppVersion(version)
+    })
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = window.electronAPI?.onUpdateStatus?.((payload) => {
+      setUpdateInfo(payload)
+
+      if (payload.status === 'checking') {
+        setUpdateChecking(true)
+        return
+      }
+
+      if (payload.status === 'not-available') {
+        setUpdateChecking(false)
+        if (manualUpdateCheck.current) {
+          setStatus(`You're on the latest version (${payload.version})`)
+          manualUpdateCheck.current = false
+        }
+        return
+      }
+
+      if (payload.status === 'available' || payload.status === 'error') {
+        setUpdateChecking(false)
+        manualUpdateCheck.current = false
+      }
+    })
+    return () => unsubscribe?.()
   }, [])
 
   useEffect(() => {
@@ -516,6 +549,53 @@ function App() {
     setStatus('Settings saved.')
   }
 
+  const handleCheckForUpdates = async () => {
+    if (!window.electronAPI?.checkForUpdates) {
+      setStatus('Update checks run in the installed desktop app.')
+      return
+    }
+
+    manualUpdateCheck.current = true
+    setUpdateChecking(true)
+    setError('')
+    try {
+      const result = await window.electronAPI.checkForUpdates()
+      if (result?.skipped) {
+        setStatus('Update checks run in the installed app only (not dev mode).')
+        setUpdateChecking(false)
+        manualUpdateCheck.current = false
+      }
+    } catch (err) {
+      setError(err.message)
+      setUpdateChecking(false)
+      manualUpdateCheck.current = false
+    }
+  }
+
+  const handleDownloadUpdate = async () => {
+    setError('')
+    try {
+      await window.electronAPI.downloadUpdate()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleInstallUpdate = () => {
+    window.electronAPI?.installUpdate?.()
+  }
+
+  const handleOpenReleasePage = async () => {
+    const url = (await window.electronAPI?.getUpdateReleasePage?.()) ?? 'https://github.com/axcel-blade/MP3-Tag-Editor/releases/latest'
+    window.open(url, '_blank', 'noopener')
+  }
+
+  const dismissUpdateBanner = () => {
+    setUpdateInfo({ status: 'idle' })
+  }
+
+  const showUpdateBanner = ['available', 'downloading', 'downloaded', 'error'].includes(updateInfo.status)
+
   const renamePreview = useMemo(() => {
     const sampleBase = currentTags?.fileName
       ? currentTags.fileName.replace(/\.mp3$/i, '')
@@ -523,7 +603,7 @@ function App() {
     return buildRenameFilename(appSettings.renameTemplate, currentTags ?? SAMPLE_TAGS_FOR_PREVIEW, sampleBase)
   }, [appSettings.renameTemplate, currentTags])
 
-  const showFileList = filePaths.length > 1
+  const showFileList = filePaths.length > 0 && (folderPath != null || filePaths.length > 1)
 
   return (
     <div
@@ -566,6 +646,70 @@ function App() {
         </div>
       </header>
 
+      {showUpdateBanner && (
+        <div className={`banner banner-update ${updateInfo.status === 'error' ? 'banner-warn' : 'banner-info'}`}>
+          <div className="update-banner-content">
+            {updateInfo.status === 'available' && (
+              <>
+                <span>
+                  <strong>v{updateInfo.version}</strong> is available.
+                </span>
+                <div className="update-banner-actions">
+                  <button type="button" className="btn btn-primary btn-sm" onClick={handleDownloadUpdate}>
+                    Download update
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleOpenReleasePage}>
+                    View release
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={dismissUpdateBanner}>
+                    Dismiss
+                  </button>
+                </div>
+              </>
+            )}
+            {updateInfo.status === 'downloading' && (
+              <>
+                <span>Downloading update… {Math.round(updateInfo.percent ?? 0)}%</span>
+                <div className="update-progress">
+                  <div
+                    className="update-progress-bar"
+                    style={{ width: `${Math.min(100, Math.max(0, updateInfo.percent ?? 0))}%` }}
+                  />
+                </div>
+              </>
+            )}
+            {updateInfo.status === 'downloaded' && (
+              <>
+                <span>
+                  <strong>v{updateInfo.version}</strong> is ready to install.
+                </span>
+                <div className="update-banner-actions">
+                  <button type="button" className="btn btn-primary btn-sm" onClick={handleInstallUpdate}>
+                    Restart and update
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={dismissUpdateBanner}>
+                    Later
+                  </button>
+                </div>
+              </>
+            )}
+            {updateInfo.status === 'error' && (
+              <>
+                <span>Could not check for updates{updateInfo.message ? `: ${updateInfo.message}` : '.'}</span>
+                <div className="update-banner-actions">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleOpenReleasePage}>
+                    Download manually
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={dismissUpdateBanner}>
+                    Dismiss
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {(status || error) && (
         <div className={`banner ${error ? 'banner-error' : 'banner-info'}`}>
           {error || status}
@@ -581,30 +725,34 @@ function App() {
       <div className={`workspace ${showFileList ? 'with-sidebar' : ''}`}>
         {showFileList && (
           <aside className="panel file-list-panel">
-            <div className="panel-header">
-              <h2>Files</h2>
-              <span className="file-count">{filePaths.length}</span>
+            <div className="file-list-panel-head">
+              <div className="panel-header">
+                <h2>{folderPath ? 'Folder' : 'Files'}</h2>
+                <span className="file-count">{filePaths.length}</span>
+              </div>
+              {folderPath && (
+                <p className="folder-path" title={folderPath}>
+                  {folderPath}
+                </p>
+              )}
             </div>
-            {folderPath && (
-              <p className="folder-path" title={folderPath}>
-                {basename(folderPath)}
-              </p>
-            )}
-            <ul className="file-list">
-              {filePaths.map((path) => (
-                <li key={path}>
-                  <button
-                    type="button"
-                    className={`file-item ${path === filePath ? 'active' : ''}`}
-                    onClick={() => handleSelectFile(path)}
-                    disabled={loading}
-                    title={path}
-                  >
-                    {basename(path)}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="file-list-scroll">
+              <ul className="file-list">
+                {filePaths.map((path) => (
+                  <li key={path}>
+                    <button
+                      type="button"
+                      className={`file-item ${path === filePath ? 'active' : ''}`}
+                      onClick={() => handleSelectFile(path)}
+                      disabled={loading}
+                      title={path}
+                    >
+                      {basename(path)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </aside>
         )}
 
@@ -649,7 +797,8 @@ function App() {
             {!currentTags ? (
               <p className="placeholder">Open an MP3 file, folder, or drag &amp; drop files here</p>
             ) : (
-              <div className="tags-grid">
+              <div className="current-tags-body">
+                <div className="tags-grid">
                 {currentTags.picture?.data ? (
                   <div className="cover-wrap">
                     <img
@@ -715,17 +864,19 @@ function App() {
                     </div>
                   </dl>
                 )}
+                </div>
               </div>
             )}
           </section>
 
           <section className="panel metadata-results">
-            <div className="panel-header">
-              <h2>Metadata Results</h2>
-              {searchQuery && <span className="query-badge">Query: {searchQuery}</span>}
-            </div>
+            <div className="metadata-results-head">
+              <div className="panel-header">
+                <h2>Metadata Results</h2>
+                {searchQuery && <span className="query-badge">Query: {searchQuery}</span>}
+              </div>
 
-            <div className="search-sources">
+              <div className="search-sources">
               <span className="search-sources-label">Search from</span>
               <div className="search-source-chips">
                 {SEARCH_PROVIDERS.map((provider) => {
@@ -785,7 +936,9 @@ function App() {
                 Search
               </button>
             </form>
+            </div>
 
+            <div className="metadata-results-body">
             {loading && (
               <p className="loading">
                 Searching {searchProviders.map(providerLabel).join(', ')}...
@@ -827,6 +980,7 @@ function App() {
                 </li>
               ))}
             </ul>
+            </div>
           </section>
         </main>
       </div>
@@ -1064,6 +1218,26 @@ function App() {
                 {' · '}
                 Spotify: <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">developer.spotify.com</a> (Premium required)
               </p>
+              </fieldset>
+
+              <fieldset className="settings-section">
+                <legend>Updates</legend>
+                <p className="modal-desc">
+                  The installed app checks GitHub Releases for new versions on startup.
+                </p>
+                {appVersion && (
+                  <p className="settings-hint">
+                    Current version: <code>v{appVersion}</code>
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary settings-log-btn"
+                  onClick={handleCheckForUpdates}
+                  disabled={updateChecking}
+                >
+                  {updateChecking ? 'Checking…' : 'Check for updates'}
+                </button>
               </fieldset>
 
               <fieldset className="settings-section">
