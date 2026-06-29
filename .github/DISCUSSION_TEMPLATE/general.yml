@@ -1,0 +1,23 @@
+---
+title: 'General discussion'
+labels: question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask a question or start a discussion about MP3 Tag Editor.
+        For bugs, use the Bug report template. For features, use Feature request.
+  - type: textarea
+    id: topic
+    attributes:
+      label: Topic
+      description: What would you like to discuss?
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Provide context, version (1.1.0), and any relevant info.
+    validations:
+      required: false
