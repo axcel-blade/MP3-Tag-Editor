@@ -564,6 +564,9 @@ function App() {
         setStatus('Update checks run in the installed app only (not dev mode).')
         setUpdateChecking(false)
         manualUpdateCheck.current = false
+      } else if (result?.error) {
+        setUpdateChecking(false)
+        manualUpdateCheck.current = false
       }
     } catch (err) {
       setError(err.message)

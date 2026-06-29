@@ -229,14 +229,7 @@ ipcMain.handle('logs:openFolder', async () => {
 
 // --- Application updates (GitHub Releases via electron-updater) ---
 
-ipcMain.handle('update:check', async () => {
-  try {
-    return await checkForUpdates()
-  } catch (err) {
-    logger.error('update:check failed', { error: err.message })
-    throw err
-  }
-})
+ipcMain.handle('update:check', async () => checkForUpdates())
 
 ipcMain.handle('update:download', async () => {
   try {

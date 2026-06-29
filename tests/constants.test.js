@@ -7,6 +7,7 @@ import {
   GITHUB_OWNER,
   GITHUB_REPO,
   GITHUB_RELEASES_URL,
+  GITHUB_UPDATE_FEED_URL,
   DEFAULT_USER_AGENT,
 } from '../electron/constants.js'
 
@@ -25,6 +26,9 @@ describe('constants', () => {
     expect(GITHUB_REPO).toBe('mp3-tag-editor')
     expect(GITHUB_RELEASES_URL).toBe(
       'https://github.com/axcel-blade/mp3-tag-editor/releases/latest',
+    )
+    expect(GITHUB_UPDATE_FEED_URL).toBe(
+      'https://github.com/axcel-blade/mp3-tag-editor/releases/latest/download',
     )
   })
 
