@@ -19,7 +19,8 @@
     "releaseType": "release"
   },
   "win": {
-    "target": ["nsis"]
+    "target": ["nsis"],
+    "artifactName": "MP3-Tag-Editor-Setup-${version}.${ext}"
   },
   "nsis": {
     "oneClick": false,
@@ -27,11 +28,13 @@
   },
   "mac": {
     "target": ["dmg"],
-    "category": "public.app-category.music"
+    "category": "public.app-category.music",
+    "artifactName": "MP3-Tag-Editor-${version}-${arch}.${ext}"
   },
   "linux": {
     "target": ["AppImage", "deb"],
     "category": "Audio",
+    "artifactName": "MP3-Tag-Editor-${version}.${ext}",
     "maintainer": "Axcel Blade <56168280+axcel-blade@users.noreply.github.com>",
     "syncDesktopName": true
   }

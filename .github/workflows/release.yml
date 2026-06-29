@@ -73,8 +73,7 @@ jobs:
             release/*.dmg
             release/*.AppImage
             release/*.deb
-            release/*.yml
-            release/*.yaml
+            release/latest*.yml
             release/*.blockmap
           if-no-files-found: error
 
@@ -100,10 +99,9 @@ jobs:
             -name '*.dmg' -o \
             -name '*.AppImage' -o \
             -name '*.deb' -o \
-            -name '*.yml' -o \
-            -name '*.yaml' -o \
+            -name 'latest*.yml' -o \
             -name '*.blockmap' \
-          \) -exec cp {} upload/ \;
+          \) ! -name 'builder-debug.yml' -exec cp {} upload/ \;
           echo "=== Installers to publish ==="
           ls -la upload/ || true
           count="$(find upload -maxdepth 1 -type f | wc -l)"

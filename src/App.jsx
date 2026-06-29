@@ -582,7 +582,10 @@ function App() {
   const handleDownloadUpdate = async () => {
     setError('')
     try {
-      await window.electronAPI.downloadUpdate()
+      const result = await window.electronAPI.downloadUpdate()
+      if (result?.error) {
+        setUpdateChecking(false)
+      }
     } catch (err) {
       setError(err.message)
     }

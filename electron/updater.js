@@ -132,8 +132,13 @@ export async function downloadUpdate() {
     throw new Error('Updates are only available in the installed app')
   }
   configureUpdaterFeed(resolveAutoUpdater())
-  await resolveAutoUpdater().downloadUpdate()
-  return true
+  try {
+    await resolveAutoUpdater().downloadUpdate()
+    return { started: true }
+  } catch (err) {
+    const message = handleUpdateError(err)
+    return { error: message }
+  }
 }
 
 /** Quit and install a downloaded update. */

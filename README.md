@@ -1,6 +1,6 @@
 # MP3 Tag Editor
 
-[![Version](https://img.shields.io/badge/version-1.3.7-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.8-blue.svg)](CHANGELOG.md)
 [![CI](https://github.com/axcel-blade/mp3-tag-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/axcel-blade/mp3-tag-editor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -76,9 +76,9 @@ Pre-built desktop installers are published on **[GitHub Releases](https://github
 
 | Platform | File |
 |----------|------|
-| Windows | `MP3 Tag Editor Setup *.exe` |
-| macOS | `MP3 Tag Editor *.dmg` |
-| Linux | `MP3 Tag Editor *.AppImage` and `mp3-tag-editor_*_amd64.deb` |
+| Windows | `MP3-Tag-Editor-Setup-*.exe` |
+| macOS | `MP3-Tag-Editor-*-*.dmg` |
+| Linux | `MP3-Tag-Editor-*.AppImage` and `mp3-tag-editor_*_amd64.deb` |
 
 Pick the latest **v1.3.x** release. No Node.js required to run the installed app.
 

@@ -240,15 +240,7 @@ ipcMain.handle('logs:openFolder', async () => {
 
 ipcMain.handle('update:check', async () => checkForUpdates())
 
-ipcMain.handle('update:download', async () => {
-  try {
-    await downloadUpdate()
-    return true
-  } catch (err) {
-    logger.error('update:download failed', { error: err.message })
-    throw err
-  }
-})
+ipcMain.handle('update:download', async () => downloadUpdate())
 
 ipcMain.handle('update:install', () => installUpdate())
 

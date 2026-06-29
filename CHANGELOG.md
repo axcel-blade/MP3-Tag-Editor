@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here. Version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [1.3.8] - 2026-06-29
+
+### Fixed
+
+- Auto-update download 404: installer filenames now match `latest.yml` (`MP3-Tag-Editor-Setup-*.exe`)
+- Release workflow publishes only `latest*.yml` metadata (excludes `builder-debug.yml`)
+- Update download failures show in the banner instead of crashing
+
 ## [1.3.7] - 2026-06-29
 
 ### Fixed
@@ -114,6 +122,7 @@ All notable changes to this project are documented here. Version numbers follow 
 
 - Initial Python-based MP3 tag editor with Spotify lookup
 
+[1.3.8]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.7...v1.3.8
 [1.3.7]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.6...v1.3.7
 [1.3.6]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.5...v1.3.6
 [1.3.5]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.4...v1.3.5
