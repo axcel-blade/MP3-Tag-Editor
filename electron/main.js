@@ -11,6 +11,13 @@ import { renameMp3File } from './rename.js'
 import { findMp3Files } from './files.js'
 import { searchAllMetadata } from './metadata/search.js'
 import { getApiConfig, saveApiConfig } from './metadata/config.js'
+import {
+  initAutoUpdater,
+  checkForUpdates,
+  downloadUpdate,
+  installUpdate,
+  getReleasePageUrl,
+} from './updater.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -58,6 +65,7 @@ app.whenReady().then(async () => {
   })
 
   createWindow()
+  initAutoUpdater(() => mainWindow)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -218,3 +226,30 @@ ipcMain.handle('logs:openFolder', async () => {
   if (dir) await shell.openPath(dir)
   return dir
 })
+
+// --- Application updates (GitHub Releases via electron-updater) ---
+
+ipcMain.handle('update:check', async () => {
+  try {
+    return await checkForUpdates()
+  } catch (err) {
+    logger.error('update:check failed', { error: err.message })
+    throw err
+  }
+})
+
+ipcMain.handle('update:download', async () => {
+  try {
+    await downloadUpdate()
+    return true
+  } catch (err) {
+    logger.error('update:download failed', { error: err.message })
+    throw err
+  }
+})
+
+ipcMain.handle('update:install', () => installUpdate())
+
+ipcMain.handle('update:getReleasePage', () => getReleasePageUrl())
+
+ipcMain.handle('update:getVersion', () => app.getVersion())

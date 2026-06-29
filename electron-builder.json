@@ -12,7 +12,12 @@
     "package.json"
   ],
   "asar": true,
-  "publish": null,
+  "publish": {
+    "provider": "github",
+    "owner": "axcel-blade",
+    "repo": "MP3-Tag-Editor",
+    "releaseType": "release"
+  },
   "win": {
     "target": ["nsis"]
   },

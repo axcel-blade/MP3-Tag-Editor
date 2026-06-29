@@ -82,6 +82,8 @@ Pre-built desktop installers are published on **[GitHub Releases](https://github
 
 Pick the latest **v1.3.x** release. No Node.js required to run the installed app.
 
+Installed builds check **GitHub Releases** for updates on startup and show a banner when a newer version is available (Settings → **Check for updates**).
+
 ## Theme
 
 Use **Settings → Appearance** to choose **System**, **Dark**, or **Light** theme.

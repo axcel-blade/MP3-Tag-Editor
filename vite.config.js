@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const nodeBuiltins = [
   'electron',
+  'electron-updater',
   'dotenv',
   'node-id3',
   ...builtinModules,
