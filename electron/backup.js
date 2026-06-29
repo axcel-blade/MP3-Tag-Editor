@@ -1,15 +1,21 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { createRequire } from 'node:module'
 
-const require = createRequire(import.meta.url)
+let resolveBackupsRoot = null
+
+/** Register how to resolve the backup folder (Electron main sets this on app ready). */
+export function configureBackupsRoot(resolver) {
+  resolveBackupsRoot = resolver
+}
 
 function backupsRoot() {
   if (process.env.MP3_BACKUP_DIR) {
     return process.env.MP3_BACKUP_DIR
   }
-  const { app } = require('electron')
-  return path.join(app.getPath('userData'), 'backups')
+  if (!resolveBackupsRoot) {
+    throw new Error('Backup storage is not configured')
+  }
+  return resolveBackupsRoot()
 }
 
 /** In-memory map of current file path → { backupPath, pathBeforeRename }. */
