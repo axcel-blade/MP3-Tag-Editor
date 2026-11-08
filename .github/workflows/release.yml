@@ -80,7 +80,16 @@ jobs:
         env:
           ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
-        run: pnpm run ${{ matrix.script }}
+        shell: bash
+        # electron-builder downloads Electron and packaging tools from GitHub
+        # Releases, which intermittently returns 504s. Retry before failing.
+        run: |
+          for attempt in 1 2 3 4; do
+            pnpm run ${{ matrix.script }} && exit 0
+            echo "Build failed (attempt $attempt), retrying in $((attempt * 30))s..."
+            sleep $((attempt * 30))
+          done
+          exit 1
 
       - name: List release output
         shell: bash
