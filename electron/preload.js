@@ -4,9 +4,18 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('electronAPI', {
   openMp3File: () => ipcRenderer.invoke('dialog:openMp3'),
   openMp3Folder: () => ipcRenderer.invoke('dialog:openFolder'),
+  openPlaylist: () => ipcRenderer.invoke('playlist:open'),
+  savePlaylist: (entries, defaultName) => ipcRenderer.invoke('playlist:save', entries, defaultName),
   readMp3Tags: (filePath) => ipcRenderer.invoke('mp3:readTags', filePath),
   writeMp3Tags: (filePath, fields, includeArtwork, artworkUrl) =>
     ipcRenderer.invoke('mp3:writeTags', filePath, fields, includeArtwork, artworkUrl),
+  saveExport: (format, defaultName, content) => ipcRenderer.invoke('export:save', format, defaultName, content),
+  revealExport: (filePath) => ipcRenderer.invoke('export:reveal', filePath),
+  pickCoverImage: () => ipcRenderer.invoke('cover:pickImage'),
+  setCoverFromFile: (filePaths, imagePath, maxEdge) => ipcRenderer.invoke('cover:setFromFile', filePaths, imagePath, maxEdge),
+  removeCover: (filePaths) => ipcRenderer.invoke('cover:remove', filePaths),
+  exportCover: (filePath) => ipcRenderer.invoke('cover:export', filePath),
+  renameMp3File: (filePath, template) => ipcRenderer.invoke('mp3:rename', filePath, template),
   undoMp3Write: (filePath) => ipcRenderer.invoke('mp3:undoWrite', filePath),
   searchMetadata: (tags, providers) => ipcRenderer.invoke('metadata:search', tags, providers),
   searchMetadataCustom: (query, providers) => ipcRenderer.invoke('metadata:searchCustom', query, providers),

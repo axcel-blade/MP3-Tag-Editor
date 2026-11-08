@@ -13,7 +13,7 @@ export { DEFAULT_RENAME_TEMPLATE }
 const WINDOWS_MAX_PATH = 260
 const PATH_RESERVE = 16
 
-/** Shrink the filename stem so dir + name + ".mp3" stays within Windows path limits. */
+/** Shrink the filename stem so dir + name + extension stays within Windows path limits. */
 export function maxStemLengthForDir(dir, cap = MAX_FILENAME_STEM_LENGTH) {
   const available = WINDOWS_MAX_PATH - String(dir).length - PATH_RESERVE
   return Math.max(32, Math.min(cap, available))
@@ -24,6 +24,7 @@ export function buildRenameFilename(template, tags, originalFilePath) {
   const dir = path.dirname(originalFilePath)
   return buildName(template, tags, originalBase, {
     maxStemLength: maxStemLengthForDir(dir),
+    extension: path.extname(originalFilePath) || '.mp3',
   })
 }
 
@@ -32,6 +33,7 @@ export function previewRename(template, tags, originalFilePath = 'song.mp3') {
   const dir = path.dirname(originalFilePath)
   return buildName(template, tags, originalBase, {
     maxStemLength: maxStemLengthForDir(dir),
+    extension: path.extname(originalFilePath) || '.mp3',
   })
 }
 

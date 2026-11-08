@@ -15,6 +15,7 @@ function envConfig() {
     musixmatchApiKey: process.env.MUSIXMATCH_API_KEY?.trim() ?? '',
     spotifyClientId: process.env.SPOTIFY_CLIENT_ID?.trim() ?? '',
     spotifyClientSecret: process.env.SPOTIFY_CLIENT_SECRET?.trim() ?? '',
+    discogsToken: process.env.DISCOGS_TOKEN?.trim() ?? '',
     musicbrainzUserAgent: process.env.MUSICBRAINZ_USER_AGENT?.trim() ?? DEFAULT_USER_AGENT,
   }
 }
@@ -24,6 +25,7 @@ export async function getApiConfig() {
   const hasEnv = Boolean(
     fromEnv.lastfmApiKey ||
       fromEnv.musixmatchApiKey ||
+      fromEnv.discogsToken ||
       (fromEnv.spotifyClientId && fromEnv.spotifyClientSecret),
   )
 
@@ -40,6 +42,7 @@ export async function getApiConfig() {
     musixmatchApiKey: fromEnv.musixmatchApiKey || saved.musixmatchApiKey || '',
     spotifyClientId: fromEnv.spotifyClientId || saved.spotifyClientId || '',
     spotifyClientSecret: fromEnv.spotifyClientSecret || saved.spotifyClientSecret || '',
+    discogsToken: fromEnv.discogsToken || saved.discogsToken || '',
     musicbrainzUserAgent: fromEnv.musicbrainzUserAgent,
     hasEnvFile: hasEnv,
     source: hasEnv ? 'env' : saved.spotifyClientId || saved.lastfmApiKey ? 'settings' : 'none',
@@ -55,6 +58,7 @@ export async function saveApiConfig(config) {
         musixmatchApiKey: config.musixmatchApiKey ?? '',
         spotifyClientId: config.spotifyClientId ?? '',
         spotifyClientSecret: config.spotifyClientSecret ?? '',
+        discogsToken: config.discogsToken ?? '',
       },
       null,
       2,

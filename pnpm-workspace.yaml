@@ -1,0 +1,11 @@
+# Dependencies allowed to run install scripts (pnpm blocks all others by default).
+allowBuilds:
+  # Downloads the Electron binary.
+  electron: true
+  # Verifies the platform-specific esbuild binary used by Vite.
+  esbuild: true
+  # Pulled in by electron-builder; selects the bundled 7-Zip for the host architecture.
+  electron-winstaller: true
+
+# electron-builder packages node_modules as-is, so use a flat (npm-style) layout.
+nodeLinker: hoisted

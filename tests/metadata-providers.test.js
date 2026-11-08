@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { searchItunes } from '../electron/metadata/providers/itunes.js'
 import { searchDeezer } from '../electron/metadata/providers/deezer.js'
 import { searchMusicBrainz } from '../electron/metadata/providers/musicbrainz.js'
+import { searchDiscogs } from '../electron/metadata/providers/discogs.js'
 
 describe('searchItunes', () => {
   afterEach(() => {
@@ -144,5 +145,75 @@ describe('searchMusicBrainz', () => {
       durationMs: 240000,
       artworkUrl: 'https://coverartarchive.org/release/rel-1/front',
     })
+  })
+})
+
+describe('searchDiscogs', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const hit = {
+    id: 7,
+    title: 'The Band (2) - Great Album',
+    year: '1999',
+    genre: ['Rock'],
+    style: ['Indie Rock'],
+    cover_image: 'https://img.discogs.com/7.jpg',
+    uri: '/release/7-Great-Album',
+  }
+  const release = {
+    title: 'Great Album',
+    year: 1999,
+    artists: [{ name: 'The Band (2)' }],
+    styles: ['Indie Rock'],
+    tracklist: [
+      { position: '1', title: 'Opening', type_: 'track' },
+      { position: '', title: 'Side B', type_: 'heading' },
+      { position: '2', title: 'My Song (Remastered)', type_: 'track' },
+    ],
+  }
+
+  it('requires a token', async () => {
+    await expect(searchDiscogs('q', {}, '', 'UA')).rejects.toThrow('Discogs token not configured')
+  })
+
+  it('maps releases and matches the track by title', async () => {
+    const fetchMock = vi.fn(async (url) => ({
+      ok: true,
+      json: async () => (String(url).includes('/database/search') ? { results: [hit] } : release),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const results = await searchDiscogs('q', { title: 'My Song', artist: 'The Band' }, 'TOKEN', 'UA/1.0')
+    expect(results[0]).toMatchObject({
+      id: 'discogs:7:2',
+      source: 'Discogs',
+      title: 'My Song (Remastered)',
+      artist: 'The Band',
+      album: 'Great Album',
+      year: '1999',
+      genre: 'Indie Rock',
+      trackNumber: '2',
+      albumArtist: 'The Band',
+      artworkUrl: 'https://img.discogs.com/7.jpg',
+      externalUrl: 'https://www.discogs.com/release/7-Great-Album',
+    })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('artist=The+Band')
+    expect(init.headers).toMatchObject({ Authorization: 'Discogs token=TOKEN', 'User-Agent': 'UA/1.0' })
+  })
+
+  it('falls back to album-level data when the release lookup fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) =>
+        String(url).includes('/database/search')
+          ? { ok: true, json: async () => ({ results: [hit] }) }
+          : { ok: false, status: 429 },
+      ),
+    )
+    const [result] = await searchDiscogs('q', { title: 'My Song' }, 'TOKEN', 'UA')
+    expect(result).toMatchObject({ title: '', trackNumber: '', artist: 'The Band', album: 'Great Album', year: '1999' })
   })
 })
