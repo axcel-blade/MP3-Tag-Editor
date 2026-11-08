@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/icon.png" alt="MP3 Tag Editor icon" width="128" height="128">
+</p>
+
 # MP3 Tag Editor
 
 [![Version](https://img.shields.io/badge/version-1.3.8-blue.svg)](CHANGELOG.md)
@@ -72,7 +76,7 @@ npm run dist:mac    # macOS .dmg (on Mac)
 npm run dist:linux  # Linux AppImage + .deb
 ```
 
-See [docs/setup.md](docs/setup.md) for details. Optional app icon: place a 256×256 PNG at `build-resources/icon.png`.
+See [docs/setup.md](docs/setup.md) for details. The app icon lives in [docs/assets/icon.svg](docs/assets/icon.svg); after editing it, run `npx electron scripts/generate-icon.js` to regenerate the PNGs (including `build-resources/icon.png`, which electron-builder uses for the installers).
 
 ## Download installers
 

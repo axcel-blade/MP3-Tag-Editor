@@ -30,6 +30,8 @@ process.env.APP_ROOT = path.join(__dirname, '..')
 dotenv.config({ path: path.join(process.env.APP_ROOT, '.env') })
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL
 const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
+/** Window/taskbar icon: public/ in dev, copied into dist/ by Vite for packaged builds. */
+const WINDOW_ICON = path.join(VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST, 'icon.png')
 
 let mainWindow = null
 
@@ -41,6 +43,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: `${APP_DISPLAY_NAME} v${APP_VERSION}`,
+    icon: WINDOW_ICON,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
