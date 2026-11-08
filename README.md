@@ -11,12 +11,14 @@ Electron desktop app that reads audio tags (MP3, FLAC, M4A, Ogg, Opus, WAV, AIFF
 - Open a single audio file or an entire folder (recursive scan)
 - Formats: MP3 (ID3v2 via node-id3) plus FLAC, M4A/M4B, Ogg Vorbis, Opus, WAV and AIFF (via TagLib / taglib-wasm)
 - Read current tags and embedded cover art
-- Search MusicBrainz, iTunes, Deezer, Musixmatch, Last.fm, and Spotify
+- Search MusicBrainz, iTunes, Deezer, Musixmatch, Last.fm, Spotify, and Discogs
 - Filter results by source; choose which providers to query
 - Apply tags field-by-field via a modal popup
 - Edit tags manually in the Current Tags panel
 - Replace embedded album artwork when **Album Artwork** is checked
 - Optional lyrics embedding (Musixmatch)
+- Open and save M3U/M3U8 playlists
+- Saved actions: chain Find & Replace, Copy Fields and Tags from Filename steps and re-run them in one click
 
 ## Quick start
 
@@ -40,6 +42,7 @@ See [docs/setup.md](docs/setup.md) for detailed installation and [docs/api-keys.
 | **Musixmatch** | Yes — lyrics + metadata |
 | **Last.fm** | Yes |
 | **Spotify** | Yes (Premium on developer account) |
+| **Discogs** | Yes (personal access token) |
 
 By default, only key-free sources are enabled: MusicBrainz, iTunes, and Deezer.
 

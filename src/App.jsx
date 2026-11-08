@@ -6,6 +6,8 @@ import { copyTags, findReplaceTags } from '@shared/tag-transforms.js'
 import { autoNumberTracks } from '@shared/auto-number.js'
 import { COVER_SIZE_OPTIONS } from '@shared/cover-image.js'
 import { extensionOf, isSupportedAudio, stemOf } from '@shared/audio-formats.js'
+import { playlistTitle } from '@shared/playlist.js'
+import { ACTION_STEP_OPTIONS, addActionStep, describeStep, runAction } from '@shared/actions.js'
 import { EXPORT_FORMATS, buildTagExport, filterFiles } from '@shared/tag-export.js'
 import { IGNORE_PLACEHOLDER, compileFilenamePattern, filenameTagChanges } from '@shared/filename-tags.js'
 import { THEME_OPTIONS, applyTheme, normalizeThemeMode } from './theme.js'
@@ -41,6 +43,7 @@ const SEARCH_PROVIDERS = [
   { key: 'musixmatch', name: 'Musixmatch', requiresKey: true },
   { key: 'lastfm', name: 'Last.fm', requiresKey: true },
   { key: 'spotify', name: 'Spotify', requiresKey: true },
+  { key: 'discogs', name: 'Discogs', requiresKey: true },
 ]
 
 /** Tabs in the tag tools popup. */
@@ -63,6 +66,7 @@ const SOURCE_CLASS = {
   Deezer: 'source-deezer',
   'Last.fm': 'source-lastfm',
   Spotify: 'source-spotify',
+  Discogs: 'source-discogs',
 }
 
 function formatDuration(ms) {
@@ -102,6 +106,8 @@ function isProviderConfigured(providerKey, config) {
       return Boolean(config.lastfmApiKey)
     case 'spotify':
       return Boolean(config.spotifyClientId && config.spotifyClientSecret)
+    case 'discogs':
+      return Boolean(config.discogsToken)
     default:
       return true
   }
@@ -110,6 +116,8 @@ function isProviderConfigured(providerKey, config) {
 function App() {
   const [filePaths, setFilePaths] = useState([])
   const [folderPath, setFolderPath] = useState(null)
+  /** Set when the file list came from an opened .m3u/.m3u8 playlist. */
+  const [playlistPath, setPlaylistPath] = useState(null)
   const [filePath, setFilePath] = useState(null)
   const [currentTags, setCurrentTags] = useState(null)
   const [metadataResults, setMetadataResults] = useState([])
@@ -138,6 +146,8 @@ function App() {
   const [tagTool, setTagTool] = useState(null)
   /** Sidebar filter text: plain words or field:value terms. */
   const [fileFilter, setFileFilter] = useState('')
+  /** Name typed in the tool popup when adding the current tool as a saved action step. */
+  const [actionName, setActionName] = useState('')
   /** Max edge (px) when embedding a cover from a file; 0 keeps the original size. */
   const [coverMaxSize, setCoverMaxSize] = useState(0)
   /** Tags for every listed file, for filtering: { key, tagsByPath } (key ties it to the list + last write). */
@@ -167,6 +177,7 @@ function App() {
     lastfmApiKey: '',
     spotifyClientId: '',
     spotifyClientSecret: '',
+    discogsToken: '',
     hasEnvFile: false,
   })
   const [isEditingTags, setIsEditingTags] = useState(false)
@@ -175,6 +186,7 @@ function App() {
     autoRenameEnabled: false,
     renameTemplate: DEFAULT_RENAME_TEMPLATE,
     theme: 'system',
+    savedActions: [],
   })
   const [systemTheme, setSystemTheme] = useState(null)
   const [updateInfo, setUpdateInfo] = useState({ status: 'idle' })
@@ -345,9 +357,16 @@ function App() {
     setMetadataResults([])
     setFilePaths(result.paths)
     setFolderPath(result.type === 'folder' ? result.folderPath : null)
+    setPlaylistPath(result.type === 'playlist' ? result.playlistPath : null)
 
     if (result.type === 'folder') {
       setStatus(`Found ${result.paths.length} audio file${result.paths.length === 1 ? '' : 's'}`)
+    }
+    if (result.type === 'playlist') {
+      setStatus(
+        `Opened ${basename(result.playlistPath)}: ${result.paths.length} file${result.paths.length === 1 ? '' : 's'}` +
+          (result.skipped ? ` (${result.skipped} missing or unsupported entr${result.skipped === 1 ? 'y' : 'ies'} skipped)` : ''),
+      )
     }
 
     await loadFile(result.paths[0])
@@ -365,11 +384,27 @@ function App() {
       setError('No supported audio files found in the selected folder.')
       setFilePaths([])
       setFolderPath(result.folderPath)
+      setPlaylistPath(null)
       setFilePath(null)
       setCurrentTags(null)
       return
     }
     await handleOpenResult(result)
+  }
+
+  const handleOpenPlaylist = async () => {
+    setError('')
+    try {
+      const result = await window.electronAPI.openPlaylist()
+      if (!result) return
+      if (result.paths.length === 0) {
+        setError(`No playable files found in ${basename(result.playlistPath)}.`)
+        return
+      }
+      await handleOpenResult(result)
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   const handleSelectFile = async (path) => {
@@ -560,6 +595,24 @@ function App() {
     </div>
   )
 
+  /** Save the selected files (or every visible file) as an M3U8 playlist, in list order. */
+  const handleSavePlaylist = async () => {
+    const paths = isBatch ? selectedPaths : visiblePaths
+    if (paths.length === 0) return
+    setError('')
+    try {
+      const tagsByPath = await readLibraryTags()
+      const entries = paths.map((path) => ({ path, title: playlistTitle(tagsByPath[path], basename(path)) }))
+      const defaultName = playlistPath ? stemOf(playlistPath) : folderPath ? basename(folderPath) : 'playlist'
+      const result = await window.electronAPI.savePlaylist(entries, defaultName)
+      if (result?.filePath) {
+        setStatus(`Saved playlist ${basename(result.filePath)} (${paths.length} file${paths.length === 1 ? '' : 's'})`)
+      }
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   /** Export tags of the selected files (or every visible file) to CSV / HTML / JSON. */
   const handleExport = async (format) => {
     const spec = EXPORT_FORMATS.find((f) => f.key === format)
@@ -693,6 +746,87 @@ function App() {
       setLoading(false)
     }
   }
+
+  const savedActions = appSettings.savedActions ?? []
+
+  /**
+   * Persist the saved-action list. Starts from the settings on disk so unsaved edits
+   * in an open Settings dialog are not written along with it.
+   */
+  const persistActions = async (nextActions) => {
+    const stored = await window.electronAPI.getAppSettings()
+    await window.electronAPI.saveAppSettings({ ...stored, savedActions: nextActions })
+    setAppSettings((s) => ({ ...s, savedActions: nextActions }))
+  }
+
+  const handleAddActionStep = async () => {
+    if (!tagTool || !ACTION_STEP_OPTIONS[tagTool.mode]) return
+    try {
+      const name = actionName.trim()
+      const next = addActionStep(savedActions, name, tagTool.mode, toolOptions)
+      await persistActions(next)
+      const action = next.find((a) => a.name === name)
+      setStatus(`Saved step ${action?.steps.length ?? ''} of action "${name}"`)
+      setError('')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleDeleteAction = async (name) => {
+    try {
+      await persistActions(savedActions.filter((a) => a.name !== name))
+      setStatus(`Deleted action "${name}"`)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  /** Run a saved action on the selected files (or the open file), then write the net changes. */
+  const handleRunAction = async (name) => {
+    const action = savedActions.find((a) => a.name === name)
+    const targets = coverTargets
+    if (!action || targets.length === 0) return
+    setError('')
+    setLoading(true)
+    let entries
+    try {
+      setStatus(`Running "${name}"…`)
+      const tagsList = await Promise.all(targets.map((p) => window.electronAPI.readMp3Tags(p)))
+      entries = targets
+        .map((path, i) => ({ path, changes: runAction(action, path, tagsList[i], fieldKeys) }))
+        .filter((entry) => Object.keys(entry.changes).length > 0)
+    } catch (err) {
+      setError(`Action "${name}" failed: ${err.message}`)
+      return
+    } finally {
+      setLoading(false)
+    }
+    if (entries.length === 0) {
+      setStatus(`Action "${name}": nothing to change`)
+      return
+    }
+    await writeChangesToFiles(entries)
+  }
+
+  const actionMenu = savedActions.length > 0 && (
+    <select
+      className="theme-select action-select"
+      value=""
+      onChange={(e) => handleRunAction(e.target.value)}
+      disabled={loading}
+      aria-label="Run saved action"
+    >
+      <option value="" disabled>
+        Run action…
+      </option>
+      {savedActions.map((action) => (
+        <option key={action.name} value={action.name} title={action.steps.map(describeStep).join('\n')}>
+          {action.name} ({action.steps.length} step{action.steps.length === 1 ? '' : 's'})
+        </option>
+      ))}
+    </select>
+  )
 
   /** Write the edited batch fields to every selected file. */
   const handleBatchSave = async () => {
@@ -994,6 +1128,7 @@ function App() {
     setProviderErrors([])
     setUndoPaths([])
     setFolderPath(null)
+    setPlaylistPath(null)
     setFilePaths(paths)
 
     if (paths.length > 1) {
@@ -1073,7 +1208,7 @@ function App() {
     })
   }, [appSettings.renameTemplate, currentTags])
 
-  const showFileList = filePaths.length > 0 && (folderPath != null || filePaths.length > 1)
+  const showFileList = filePaths.length > 0 && (folderPath != null || playlistPath != null || filePaths.length > 1)
 
   return (
     <div
@@ -1096,7 +1231,7 @@ function App() {
       <header className="header">
         <div className="header-left">
           <h1>MP3 Tag Editor</h1>
-          <p className="subtitle">Musixmatch · MusicBrainz · Last.fm · iTunes · Spotify · Deezer</p>
+          <p className="subtitle">Musixmatch · MusicBrainz · Last.fm · iTunes · Spotify · Deezer · Discogs</p>
         </div>
         <div className="header-actions">
           {canUndo && filePath && (
@@ -1106,6 +1241,9 @@ function App() {
           )}
           <button type="button" className="btn btn-secondary" onClick={() => setShowSettings(true)}>
             Settings
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={handleOpenPlaylist} disabled={loading}>
+            Open Playlist
           </button>
           <button type="button" className="btn btn-secondary" onClick={handleOpenFolder} disabled={loading}>
             Open Folder
@@ -1197,10 +1335,19 @@ function App() {
           <aside className="panel file-list-panel">
             <div className="file-list-panel-head">
               <div className="panel-header">
-                <h2>{folderPath ? 'Folder' : 'Files'}</h2>
+                <h2>{playlistPath ? 'Playlist' : folderPath ? 'Folder' : 'Files'}</h2>
                 <span className="file-count">
                   {filterActive ? `${visiblePaths.length}/${filePaths.length}` : filePaths.length}
                 </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm save-playlist-btn"
+                  onClick={handleSavePlaylist}
+                  disabled={loading}
+                  title={isBatch ? 'Save the selected files as a playlist' : 'Save the listed files as a playlist'}
+                >
+                  Save playlist
+                </button>
                 <select
                   className="theme-select export-select"
                   value=""
@@ -1243,6 +1390,11 @@ function App() {
                     </button>
                   )}
                 </div>
+              )}
+              {playlistPath && (
+                <p className="folder-path" title={playlistPath}>
+                  {basename(playlistPath)}
+                </p>
               )}
               {folderPath && (
                 <p className="folder-path" title={folderPath}>
@@ -1294,6 +1446,7 @@ function App() {
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('rename')} disabled={loading}>
                   Rename
                 </button>
+                {actionMenu}
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
@@ -1380,6 +1533,7 @@ function App() {
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('rename')} disabled={loading}>
                         Rename
                       </button>
+                      {actionMenu}
                     </>
                   )}
                   {!isEditingTags ? (
@@ -1958,6 +2112,34 @@ function App() {
                 )}
               </div>
 
+              {ACTION_STEP_OPTIONS[tagTool.mode] && (
+                <div className="action-step-row">
+                  <input
+                    type="text"
+                    list="saved-action-names"
+                    value={actionName}
+                    onChange={(e) => setActionName(e.target.value)}
+                    placeholder="Action name (new or existing)"
+                    aria-label="Action name"
+                    maxLength={60}
+                  />
+                  <datalist id="saved-action-names">
+                    {savedActions.map((a) => (
+                      <option key={a.name} value={a.name} />
+                    ))}
+                  </datalist>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleAddActionStep}
+                    disabled={!actionName.trim() || Boolean(toolPreview.error)}
+                    title="Save these settings as a step you can re-run later from Run action…"
+                  >
+                    Add as action step
+                  </button>
+                </div>
+              )}
+
               <div className="apply-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setTagTool(null)}>
                   Cancel
@@ -2065,6 +2247,17 @@ function App() {
                 />
               </label>
               <label>
+                Discogs personal access token
+                <input
+                  type="password"
+                  value={apiConfig.discogsToken}
+                  onChange={(e) => setApiConfig((c) => ({ ...c, discogsToken: e.target.value }))}
+                  placeholder="DISCOGS_TOKEN"
+                  autoComplete="off"
+                  disabled={apiConfig.hasEnvFile}
+                />
+              </label>
+              <label>
                 Last.fm API Key
                 <input
                   type="password"
@@ -2102,8 +2295,42 @@ function App() {
                 {' · '}
                 Last.fm: <a href="https://www.last.fm/api/account/create" target="_blank" rel="noreferrer">last.fm/api</a>
                 {' · '}
+                Discogs: <a href="https://www.discogs.com/settings/developers" target="_blank" rel="noreferrer">discogs.com/settings/developers</a>
+                {' · '}
                 Spotify: <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer">developer.spotify.com</a> (Premium required)
               </p>
+              </fieldset>
+
+              <fieldset className="settings-section">
+                <legend>Saved actions</legend>
+                {savedActions.length === 0 ? (
+                  <p className="modal-desc">
+                    No saved actions yet. In Find &amp; Replace, Copy Fields or Tags from Filename, use{' '}
+                    <strong>Add as action step</strong> to build one.
+                  </p>
+                ) : (
+                  <ul className="saved-action-list">
+                    {savedActions.map((action) => (
+                      <li key={action.name}>
+                        <div>
+                          <strong>{action.name}</strong>
+                          <ol>
+                            {action.steps.map((step, i) => (
+                              <li key={i}>{describeStep(step)}</li>
+                            ))}
+                          </ol>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleDeleteAction(action.name)}
+                        >
+                          Delete
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </fieldset>
 
               <fieldset className="settings-section">

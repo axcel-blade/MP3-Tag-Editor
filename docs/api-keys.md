@@ -35,6 +35,16 @@ MUSICBRAINZ_USER_AGENT=MP3TagEditor/1.1.0 (your-email@example.com)
    LASTFM_API_KEY=your_key_here
    ```
 
+### Discogs
+
+1. Sign in and generate a personal access token at [discogs.com/settings/developers](https://www.discogs.com/settings/developers)
+2. Add to `.env` (or paste it in Settings):
+   ```env
+   DISCOGS_TOKEN=your_token_here
+   ```
+3. Discogs is album-oriented: results fill album, artist, year, genre and cover. The track title and number
+   are filled in only when your file's title matches a track on the release.
+
 ### Spotify
 
 1. Create an app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)

@@ -4,6 +4,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('electronAPI', {
   openMp3File: () => ipcRenderer.invoke('dialog:openMp3'),
   openMp3Folder: () => ipcRenderer.invoke('dialog:openFolder'),
+  openPlaylist: () => ipcRenderer.invoke('playlist:open'),
+  savePlaylist: (entries, defaultName) => ipcRenderer.invoke('playlist:save', entries, defaultName),
   readMp3Tags: (filePath) => ipcRenderer.invoke('mp3:readTags', filePath),
   writeMp3Tags: (filePath, fields, includeArtwork, artworkUrl) =>
     ipcRenderer.invoke('mp3:writeTags', filePath, fields, includeArtwork, artworkUrl),

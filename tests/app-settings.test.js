@@ -28,6 +28,7 @@ describe('app settings', () => {
       autoRenameEnabled: false,
       renameTemplate: DEFAULT_RENAME_TEMPLATE,
       theme: 'system',
+      savedActions: [],
     })
   })
 
@@ -45,6 +46,7 @@ describe('app settings', () => {
       autoRenameEnabled: true,
       renameTemplate: '{title}',
       theme: 'system',
+      savedActions: [],
     })
   })
 
@@ -60,6 +62,14 @@ describe('app settings', () => {
       autoRenameEnabled: true,
       renameTemplate: '{artist}',
       theme: 'dark',
+      savedActions: [],
     })
+  })
+
+  it('round-trips saved actions and drops invalid ones', async () => {
+    const action = { name: 'Tidy', steps: [{ mode: 'copy', options: { target: 'albumArtist', format: '{artist}', clearSource: false } }] }
+    await saveAppSettings({ theme: 'dark', savedActions: [action, { name: 'Bad', steps: [{ mode: 'rm -rf' }] }] })
+    const settings = await getAppSettings()
+    expect(settings.savedActions).toEqual([action])
   })
 })

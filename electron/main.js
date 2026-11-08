@@ -6,7 +6,8 @@ import dotenv from 'dotenv'
 import { APP_DISPLAY_NAME, APP_VERSION } from './constants.js'
 import { initLogger, logger, getLogDirectory, getCurrentLogPath } from './logger.js'
 import { readAudioTags, writeAudioTags, readAudioCover, writeAudioCover, removeAudioCover } from './audio.js'
-import { AUDIO_EXTENSIONS } from '../shared/audio-formats.js'
+import { AUDIO_EXTENSIONS, isSupportedAudio } from '../shared/audio-formats.js'
+import { formatM3U, parseM3U } from '../shared/playlist.js'
 import { loadCoverFromFile } from './cover.js'
 import { extensionForMime } from '../shared/cover-image.js'
 import { backupMp3File, restoreMp3Backup, clearBackup, transferBackup, configureBackupsRoot } from './backup.js'
@@ -102,6 +103,60 @@ ipcMain.handle('dialog:openFolder', async () => {
   const folderPath = result.filePaths[0]
   const paths = await findAudioFiles(folderPath)
   return { type: 'folder', folderPath, paths }
+})
+
+// --- Playlists (M3U / M3U8) ---
+
+ipcMain.handle('playlist:open', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Open playlist',
+    filters: [{ name: 'Playlists', extensions: ['m3u8', 'm3u'] }],
+    properties: ['openFile'],
+  })
+  if (result.canceled || result.filePaths.length === 0) return null
+
+  const playlistPath = result.filePaths[0]
+  const baseDir = path.dirname(playlistPath)
+  const locations = parseM3U(await fs.readFile(playlistPath, 'utf8'))
+
+  const paths = []
+  let skipped = 0
+  for (const location of locations) {
+    const resolved = path.resolve(baseDir, location)
+    if (!isSupportedAudio(resolved) || paths.includes(resolved)) {
+      skipped += 1
+      continue
+    }
+    try {
+      await fs.access(resolved)
+      paths.push(resolved)
+    } catch {
+      skipped += 1
+    }
+  }
+  logger.info('Opened playlist', { file: path.basename(playlistPath), entries: paths.length, skipped })
+  return { type: 'playlist', playlistPath, paths, skipped }
+})
+
+/** Save files as an M3U8 playlist. Entries on the same drive are stored relative to the playlist. */
+ipcMain.handle('playlist:save', async (_event, entries, defaultName) => {
+  if (!Array.isArray(entries) || entries.length === 0) throw new Error('No files to add to the playlist')
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save playlist',
+    defaultPath: path.join(app.getPath('music'), `${path.basename(String(defaultName || 'playlist'))}.m3u8`),
+    filters: [{ name: 'M3U8 playlist', extensions: ['m3u8'] }],
+  })
+  if (result.canceled || !result.filePath) return null
+
+  const baseDir = path.dirname(result.filePath)
+  const items = entries.map(({ path: filePath, title }) => {
+    const relative = path.relative(baseDir, String(filePath))
+    return { location: path.isAbsolute(relative) ? String(filePath) : relative, title }
+  })
+  await fs.writeFile(result.filePath, formatM3U(items), 'utf8')
+  logger.info('Saved playlist', { file: path.basename(result.filePath), entries: items.length })
+  return { filePath: result.filePath }
 })
 
 // --- Tag report export ---
