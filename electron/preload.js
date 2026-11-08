@@ -7,8 +7,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readMp3Tags: (filePath) => ipcRenderer.invoke('mp3:readTags', filePath),
   writeMp3Tags: (filePath, fields, includeArtwork, artworkUrl) =>
     ipcRenderer.invoke('mp3:writeTags', filePath, fields, includeArtwork, artworkUrl),
+  saveExport: (format, defaultName, content) => ipcRenderer.invoke('export:save', format, defaultName, content),
+  revealExport: (filePath) => ipcRenderer.invoke('export:reveal', filePath),
   renameMp3File: (filePath, template) => ipcRenderer.invoke('mp3:rename', filePath, template),
-  undoMp3Write:(filePath) => ipcRenderer.invoke('mp3:undoWrite', filePath),
+  undoMp3Write: (filePath) => ipcRenderer.invoke('mp3:undoWrite', filePath),
   searchMetadata: (tags, providers) => ipcRenderer.invoke('metadata:search', tags, providers),
   searchMetadataCustom: (query, providers) => ipcRenderer.invoke('metadata:searchCustom', query, providers),
   getApiConfig: () => ipcRenderer.invoke('metadata:getConfig'),

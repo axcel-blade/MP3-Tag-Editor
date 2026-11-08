@@ -1190,3 +1190,19 @@
   top: 0;
   background: var(--bg-elevated);
 }
+
+.file-filter {
+  width: 100%;
+  margin-top: 0.4rem;
+  box-sizing: border-box;
+}
+
+.file-filter-hint {
+  font-size: 0.72rem;
+  margin: 0.25rem 0 0;
+}
+
+.export-select {
+  margin-left: auto;
+  font-size: 0.75rem;
+}

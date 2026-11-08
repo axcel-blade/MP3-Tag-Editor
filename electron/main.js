@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme } from 'electron'
 import path from 'node:path'
+import fs from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import { APP_DISPLAY_NAME, APP_VERSION } from './constants.js'
@@ -98,6 +99,35 @@ ipcMain.handle('dialog:openFolder', async () => {
   const folderPath = result.filePaths[0]
   const paths = await findMp3Files(folderPath)
   return { type: 'folder', folderPath, paths }
+})
+
+// --- Tag report export ---
+
+const EXPORT_FILTERS = {
+  csv: { name: 'CSV', extensions: ['csv'] },
+  html: { name: 'HTML', extensions: ['html'] },
+  json: { name: 'JSON', extensions: ['json'] },
+}
+
+ipcMain.handle('export:save', async (_event, format, defaultName, content) => {
+  const filter = EXPORT_FILTERS[format]
+  if (!filter) throw new Error(`Unknown export format: ${format}`)
+  if (typeof content !== 'string') throw new Error('Nothing to export')
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Export tag report',
+    defaultPath: path.join(app.getPath('documents'), path.basename(String(defaultName || 'tag-report'))),
+    filters: [filter],
+  })
+  if (result.canceled || !result.filePath) return null
+
+  await fs.writeFile(result.filePath, content, 'utf8')
+  logger.info('Exported tag report', { format, file: path.basename(result.filePath) })
+  return { filePath: result.filePath }
+})
+
+ipcMain.handle('export:reveal', (_event, filePath) => {
+  if (typeof filePath === 'string' && filePath) shell.showItemInFolder(filePath)
 })
 
 // --- Metadata search (parallel provider queries) ---

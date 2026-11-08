@@ -4,6 +4,7 @@ import { buildRenameFilename, DEFAULT_RENAME_TEMPLATE, RENAME_PLACEHOLDERS } fro
 import { KEEP_PLACEHOLDER, buildBatchChanges, createBatchDraft, mergeTags } from '@shared/batch-tags.js'
 import { copyTags, findReplaceTags } from '@shared/tag-transforms.js'
 import { autoNumberTracks } from '@shared/auto-number.js'
+import { EXPORT_FORMATS, buildTagExport, filterFiles } from '@shared/tag-export.js'
 import { IGNORE_PLACEHOLDER, compileFilenamePattern, filenameTagChanges } from '@shared/filename-tags.js'
 import { THEME_OPTIONS, applyTheme, normalizeThemeMode } from './theme.js'
 import './App.css'
@@ -133,6 +134,10 @@ function App() {
   const [batchKey, setBatchKey] = useState(null)
   /** Open Find & Replace / Copy Fields tool: { mode: 'replace' | 'copy', entries: [{ path, tags }] | null }. */
   const [tagTool, setTagTool] = useState(null)
+  /** Sidebar filter text: plain words or field:value terms. */
+  const [fileFilter, setFileFilter] = useState('')
+  /** Tags for every listed file, for filtering: { key, tagsByPath } (key ties it to the list + last write). */
+  const [libraryTags, setLibraryTags] = useState(null)
   const [toolOptions, setToolOptions] = useState({
     fields: TAG_FIELDS.map(({ key }) => key),
     find: '',
@@ -426,6 +431,63 @@ function App() {
   }, [])
 
   const isBatch = selectedPaths.length > 1
+  const fieldKeys = useMemo(() => TAG_FIELDS.map(({ key }) => key), [])
+  const libraryKey = `${filePaths.join('|')}#${batchReloadToken}`
+  const libraryTagsByPath = libraryTags?.key === libraryKey ? libraryTags.tagsByPath : null
+  const filterActive = fileFilter.trim() !== ''
+  const visiblePaths = useMemo(
+    () => (filterActive ? filterFiles(filePaths, fileFilter, libraryTagsByPath ?? {}, fieldKeys) : filePaths),
+    [filterActive, filePaths, fileFilter, libraryTagsByPath, fieldKeys],
+  )
+
+  /** Read tags for every listed file (cached until the list changes or tags are written). */
+  const readLibraryTags = useCallback(async () => {
+    if (libraryTagsByPath) return libraryTagsByPath
+    const tagsList = await Promise.all(filePaths.map((p) => window.electronAPI.readMp3Tags(p)))
+    const tagsByPath = Object.fromEntries(filePaths.map((p, i) => [p, tagsList[i]]))
+    setLibraryTags({ key: libraryKey, tagsByPath })
+    return tagsByPath
+  }, [libraryTagsByPath, filePaths, libraryKey])
+
+  // Filtering by tag needs every file's tags; load them once the user starts typing.
+  useEffect(() => {
+    if (!filterActive || libraryTagsByPath || filePaths.length === 0) return undefined
+    let cancelled = false
+    Promise.all(filePaths.map((p) => window.electronAPI.readMp3Tags(p)))
+      .then((tagsList) => {
+        if (cancelled) return
+        setLibraryTags({ key: libraryKey, tagsByPath: Object.fromEntries(filePaths.map((p, i) => [p, tagsList[i]])) })
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [filterActive, libraryTagsByPath, filePaths, libraryKey])
+
+  /** Export tags of the selected files (or every visible file) to CSV / HTML / JSON. */
+  const handleExport = async (format) => {
+    const spec = EXPORT_FORMATS.find((f) => f.key === format)
+    if (!spec) return
+    const paths = isBatch ? selectedPaths : visiblePaths
+    if (paths.length === 0) return
+    setError('')
+    try {
+      const tagsByPath = await readLibraryTags()
+      const entries = paths.map((path) => ({ path, tags: tagsByPath[path] }))
+      const title = folderPath ? `MP3 Tag Report — ${basename(folderPath)}` : 'MP3 Tag Report'
+      const content = buildTagExport(format, entries, TAG_FIELDS, { title })
+      const baseName = folderPath ? basename(folderPath) : 'tag-report'
+      const result = await window.electronAPI.saveExport(format, `${baseName}.${spec.extension}`, content)
+      if (result?.filePath) {
+        setStatus(`Exported ${paths.length} file${paths.length === 1 ? '' : 's'} to ${basename(result.filePath)}`)
+        window.electronAPI.revealExport?.(result.filePath)
+      }
+    } catch (err) {
+      setError(err.message)
+    }
+  }
   const selectionKey = selectedPaths.join('|')
   // Merged tags are only valid for the selection they were read from.
   const batchLoaded = isBatch && batchKey === selectionKey && batchDraft != null
@@ -448,11 +510,11 @@ function App() {
     }
 
     if (e.shiftKey && filePath) {
-      const from = filePaths.indexOf(filePath)
-      const to = filePaths.indexOf(path)
+      const from = visiblePaths.indexOf(filePath)
+      const to = visiblePaths.indexOf(path)
       if (from !== -1 && to !== -1) {
         const [lo, hi] = from < to ? [from, to] : [to, from]
-        const range = filePaths.slice(lo, hi + 1)
+        const range = visiblePaths.slice(lo, hi + 1)
         if (range.length > 1) {
           setSelectedPaths(range)
           return
@@ -468,7 +530,7 @@ function App() {
   }
 
   const handleSelectAll = () => {
-    if (filePaths.length > 1) setSelectedPaths(filePaths)
+    if (visiblePaths.length > 1) setSelectedPaths(visiblePaths)
   }
 
   const handleClearSelection = () => {
@@ -1040,8 +1102,36 @@ function App() {
             <div className="file-list-panel-head">
               <div className="panel-header">
                 <h2>{folderPath ? 'Folder' : 'Files'}</h2>
-                <span className="file-count">{filePaths.length}</span>
+                <span className="file-count">
+                  {filterActive ? `${visiblePaths.length}/${filePaths.length}` : filePaths.length}
+                </span>
+                <select
+                  className="theme-select export-select"
+                  value=""
+                  onChange={(e) => handleExport(e.target.value)}
+                  disabled={loading}
+                  aria-label="Export tags"
+                  title={isBatch ? 'Export the selected files' : 'Export the listed files'}
+                >
+                  <option value="" disabled>
+                    Export…
+                  </option>
+                  {EXPORT_FORMATS.map(({ key, label }) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
               </div>
+              <input
+                type="search"
+                className="file-filter"
+                value={fileFilter}
+                onChange={(e) => setFileFilter(e.target.value)}
+                placeholder="Filter: text or artist:name, year:1999"
+                aria-label="Filter files"
+              />
+              {filterActive && !libraryTagsByPath && <p className="muted file-filter-hint">Reading tags…</p>}
               {filePaths.length > 1 && (
                 <div className="file-selection-bar">
                   <span className="muted">
@@ -1066,7 +1156,7 @@ function App() {
             </div>
             <div className="file-list-scroll">
               <ul className="file-list">
-                {filePaths.map((path) => (
+                {visiblePaths.map((path) => (
                   <li key={path}>
                     <button
                       type="button"
@@ -1081,6 +1171,7 @@ function App() {
                   </li>
                 ))}
               </ul>
+              {filterActive && visiblePaths.length === 0 && <p className="placeholder">No files match the filter</p>}
             </div>
           </aside>
         )}
