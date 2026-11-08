@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here. Version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-11-08
+
+### Added
+
+- Batch editing: Ctrl/Shift+click or Select all to edit several files at once; differing fields show `<keep>`
+- Find & Replace across tags (plain text or regular expressions, case options, per-field)
+- Copy Fields: copy, combine or move values between fields with format strings such as `{artist} - {album}`
+- Tags from Filename: parse tags from file and folder names with patterns like `{trackNumber} - {artist} - {title}`
+- Rename Files on demand from tags, with a preview
+- Disc number field (ID3 `TPOS`) and an Auto-Number tool for tracks and discs (padding, totals, reset per folder or album)
+- File list filter (plain text or `field:value`, e.g. `artist:beatles year:1999`)
+- Export tag reports to CSV, HTML and JSON
+- Cover art: set from a local image (optionally resized), export the embedded cover, remove covers — for one file or a batch
+- FLAC, M4A/M4B, Ogg Vorbis, Opus, WAV and AIFF support via TagLib (taglib-wasm); MP3 still uses node-id3
+- Discogs metadata source (personal access token)
+- Open and save M3U/M3U8 playlists
+- Saved actions: chain Find & Replace, Copy Fields and Tags from Filename steps and re-run them in one click
+- New app icon
+
+### Changed
+
+- Undo Last Write reverts every file written by the last batch operation
+- Auto-rename keeps each file's original extension
+- Development now uses pnpm instead of npm
+
 ## [1.3.8] - 2026-06-29
 
 ### Fixed
@@ -122,6 +147,7 @@ All notable changes to this project are documented here. Version numbers follow 
 
 - Initial Python-based MP3 tag editor with Spotify lookup
 
+[1.4.0]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.8...v1.4.0
 [1.3.8]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.7...v1.3.8
 [1.3.7]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.6...v1.3.7
 [1.3.6]: https://github.com/axcel-blade/mp3-tag-editor/compare/v1.3.5...v1.3.6
