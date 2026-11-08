@@ -51,10 +51,35 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/electron-cache
+            ${{ runner.temp }}/electron-builder-cache
+          key: electron-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: electron-${{ runner.os }}-
+
+      # The Electron postinstall downloads its binary from GitHub Releases, which
+      # occasionally returns 504s. Retry the install a few times before failing.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        shell: bash
+        env:
+          ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
+          electron_config_cache: ${{ runner.temp }}/electron-cache
+          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+        run: |
+          for attempt in 1 2 3 4; do
+            pnpm install --frozen-lockfile && exit 0
+            echo "pnpm install failed (attempt $attempt), retrying in $((attempt * 20))s..."
+            sleep $((attempt * 20))
+          done
+          exit 1
 
       - name: Build installer
+        env:
+          ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
+          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
         run: pnpm run ${{ matrix.script }}
 
       - name: List release output
@@ -83,7 +108,7 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: build
-    if: ${{ !cancelled() }}
+    if: ${{ needs.build.result == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
