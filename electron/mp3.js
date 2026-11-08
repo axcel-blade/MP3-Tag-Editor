@@ -1,7 +1,7 @@
 import NodeID3 from 'node-id3'
 
 /** ID3 text fields exposed in the UI and write path. */
-const TAG_FIELDS = ['title', 'artist', 'album', 'year', 'genre', 'trackNumber', 'albumArtist']
+const TAG_FIELDS = ['title', 'artist', 'album', 'year', 'genre', 'trackNumber', 'discNumber', 'albumArtist']
 
 /** Encode binary cover art for the renderer (data URLs). */
 function toBase64(data) {
@@ -35,6 +35,7 @@ function normalizeTags(filePath, id3Tags = {}) {
     year: id3Tags.year ?? '',
     genre: id3Tags.genre ?? '',
     trackNumber: id3Tags.trackNumber ?? '',
+    discNumber: id3Tags.partOfSet ?? '',
     albumArtist: id3Tags.performerInfo ?? '',
     lyrics: id3Tags.unsynchronisedLyrics?.text?.trim() ?? '',
     picture: pictureFromNodeId3(id3Tags),
@@ -69,6 +70,7 @@ export async function writeMp3Tags(filePath, fields, includeArtwork, artworkUrl)
   if (fields.year !== undefined) tags.year = fields.year
   if (fields.genre !== undefined) tags.genre = fields.genre
   if (fields.trackNumber !== undefined) tags.trackNumber = fields.trackNumber
+  if (fields.discNumber !== undefined) tags.partOfSet = fields.discNumber
   if (fields.albumArtist !== undefined) tags.performerInfo = fields.albumArtist
 
   if (fields.lyrics !== undefined) {

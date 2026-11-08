@@ -26,6 +26,8 @@ export function applyRenameTemplate(template, tags, originalBaseName = '') {
     genre: tags.genre ?? '',
     trackNumber: tags.trackNumber ?? '',
     albumArtist: tags.albumArtist ?? '',
+    disc: tags.discNumber ?? '',
+    discNumber: tags.discNumber ?? '',
     track: tags.trackNumber ?? '',
     filename: originalBaseName,
   }
@@ -67,5 +69,7 @@ export const RENAME_PLACEHOLDERS = [
   '{trackNumber}',
   '{track}',
   '{albumArtist}',
+  '{discNumber}',
+  '{disc}',
   '{filename}',
 ]

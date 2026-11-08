@@ -97,6 +97,13 @@ describe('writeMp3Tags', () => {
     expect(updated.albumArtist).toBe('Various Artists')
   })
 
+  it('reads and writes disc number via partOfSet (TPOS)', async () => {
+    const filePath = await createFixtureMp3(tempDir, { partOfSet: '1/2' })
+    expect((await readMp3Tags(filePath)).discNumber).toBe('1/2')
+    const updated = await writeMp3Tags(filePath, { discNumber: '2/2' }, false, null)
+    expect(updated.discNumber).toBe('2/2')
+  })
+
   it('embeds artwork when includeArtwork is true', async () => {
     const filePath = await createFixtureMp3(tempDir)
     const imageBytes = Buffer.from('fake-image-bytes')

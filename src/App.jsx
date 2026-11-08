@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { buildRenameFilename, DEFAULT_RENAME_TEMPLATE, RENAME_PLACEHOLDERS } from '@shared/rename-template.js'
 import { KEEP_PLACEHOLDER, buildBatchChanges, createBatchDraft, mergeTags } from '@shared/batch-tags.js'
 import { copyTags, findReplaceTags } from '@shared/tag-transforms.js'
+import { autoNumberTracks } from '@shared/auto-number.js'
 import { IGNORE_PLACEHOLDER, compileFilenamePattern, filenameTagChanges } from '@shared/filename-tags.js'
 import { THEME_OPTIONS, applyTheme, normalizeThemeMode } from './theme.js'
 import './App.css'
@@ -14,6 +15,7 @@ const SAMPLE_TAGS_FOR_PREVIEW = {
   year: '2024',
   genre: 'Pop',
   trackNumber: '03',
+  discNumber: '1',
   albumArtist: 'Artist Name',
 }
 
@@ -25,6 +27,7 @@ const TAG_FIELDS = [
   { key: 'year', label: 'Year' },
   { key: 'genre', label: 'Genre' },
   { key: 'trackNumber', label: 'Track #' },
+  { key: 'discNumber', label: 'Disc #' },
   { key: 'albumArtist', label: 'Album Artist' },
 ]
 
@@ -42,6 +45,7 @@ const TAG_TOOL_MODES = [
   { key: 'replace', label: 'Find & Replace' },
   { key: 'copy', label: 'Copy Fields' },
   { key: 'filename', label: 'Tags from Filename' },
+  { key: 'number', label: 'Auto-Number' },
   { key: 'rename', label: 'Rename Files' },
 ]
 
@@ -139,6 +143,11 @@ function App() {
     format: '{artist}',
     filenamePattern: '{artist} - {title}',
     renameTemplate: DEFAULT_RENAME_TEMPLATE,
+    numberStart: '1',
+    numberPadding: '2',
+    numberIncludeTotal: false,
+    numberResetBy: 'none',
+    numberDiscs: false,
     clearSource: false,
   })
   const [isDragging, setIsDragging] = useState(false)
@@ -590,6 +599,16 @@ function App() {
           default:
             return {}
         }
+      }
+      if (tagTool.mode === 'number') {
+        const rows = autoNumberTracks(tagTool.entries, {
+          start: toolOptions.numberStart,
+          padding: toolOptions.numberPadding,
+          includeTotal: toolOptions.numberIncludeTotal,
+          resetBy: toolOptions.numberResetBy,
+          numberDiscs: toolOptions.numberDiscs,
+        }).filter((row) => Object.keys(row.changes).length > 0)
+        return { rows, error: '' }
       }
       const rows = tagTool.entries
         .map(({ path, tags }) => ({ path, tags, changes: computeToolChanges(path, tags) }))
@@ -1082,6 +1101,9 @@ function App() {
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('filename')} disabled={loading}>
                   From Filename
                 </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('number')} disabled={loading}>
+                  Auto-Number
+                </button>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('rename')} disabled={loading}>
                   Rename
                 </button>
@@ -1163,6 +1185,9 @@ function App() {
                       </button>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('filename')} disabled={loading}>
                         From Filename
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('number')} disabled={loading}>
+                        Auto-Number
                       </button>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('rename')} disabled={loading}>
                         Rename
@@ -1601,6 +1626,62 @@ function App() {
                     Use <code>\</code> to read folder names too, e.g. <code>{String.raw`{artist}\{album}\{title}`}</code>.
                     Files whose names don&apos;t fit the pattern are skipped.
                   </p>
+                </div>
+              ) : tagTool.mode === 'number' ? (
+                <div className="tag-tool-form">
+                  <div className="tag-tool-options">
+                    <label>
+                      Start at
+                      <input
+                        type="number"
+                        min="0"
+                        value={toolOptions.numberStart}
+                        onChange={(e) => updateToolOptions('numberStart', e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Digits (leading zeros)
+                      <input
+                        type="number"
+                        min="0"
+                        max="4"
+                        value={toolOptions.numberPadding}
+                        onChange={(e) => updateToolOptions('numberPadding', e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Restart numbering when
+                      <select
+                        className="theme-select"
+                        value={toolOptions.numberResetBy}
+                        onChange={(e) => updateToolOptions('numberResetBy', e.target.value)}
+                      >
+                        <option value="none">Never</option>
+                        <option value="folder">Folder changes</option>
+                        <option value="album">Album changes</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="tag-tool-options">
+                    <label className="settings-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={toolOptions.numberIncludeTotal}
+                        onChange={(e) => updateToolOptions('numberIncludeTotal', e.target.checked)}
+                      />
+                      <span>Include total (e.g. 03/12)</span>
+                    </label>
+                    <label className="settings-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={toolOptions.numberDiscs}
+                        onChange={(e) => updateToolOptions('numberDiscs', e.target.checked)}
+                        disabled={toolOptions.numberResetBy === 'none'}
+                      />
+                      <span>Also set disc numbers (one disc per group)</span>
+                    </label>
+                  </div>
+                  <p className="settings-hint">Files are numbered in the order they appear in the file list.</p>
                 </div>
               ) : tagTool.mode === 'rename' ? (
                 <div className="tag-tool-form">
