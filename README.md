@@ -1,30 +1,37 @@
+<p align="center">
+  <img src="docs/assets/icon.png" alt="MP3 Tag Editor icon" width="128" height="128">
+</p>
+
 # MP3 Tag Editor
 
-[![Version](https://img.shields.io/badge/version-1.3.8-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](CHANGELOG.md)
 [![CI](https://github.com/axcel-blade/mp3-tag-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/axcel-blade/mp3-tag-editor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Electron desktop app that reads MP3 ID3 tags, searches multiple metadata APIs in parallel, and lets you selectively apply tags—including lyrics and album artwork—back to your files.
+Electron desktop app that reads audio tags (MP3, FLAC, M4A, Ogg, Opus, WAV, AIFF), searches multiple metadata APIs in parallel, and lets you selectively apply tags—including lyrics and album artwork—back to your files.
 
 ## Features
 
-- Open a single MP3 or an entire folder (recursive scan)
+- Open a single audio file or an entire folder (recursive scan)
+- Formats: MP3 (ID3v2 via node-id3) plus FLAC, M4A/M4B, Ogg Vorbis, Opus, WAV and AIFF (via TagLib / taglib-wasm)
 - Read current tags and embedded cover art
-- Search MusicBrainz, iTunes, Deezer, Musixmatch, Last.fm, and Spotify
+- Search MusicBrainz, iTunes, Deezer, Musixmatch, Last.fm, Spotify, and Discogs
 - Filter results by source; choose which providers to query
 - Apply tags field-by-field via a modal popup
 - Edit tags manually in the Current Tags panel
 - Replace embedded album artwork when **Album Artwork** is checked
 - Optional lyrics embedding (Musixmatch)
+- Open and save M3U/M3U8 playlists
+- Saved actions: chain Find & Replace, Copy Fields and Tags from Filename steps and re-run them in one click
 
 ## Quick start
 
 ```bash
 git clone https://github.com/axcel-blade/mp3-tag-editor.git
 cd mp3-tag-editor
-npm install
+pnpm install
 copy .env.example .env   # optional API keys
-npm run dev
+pnpm dev
 ```
 
 See [docs/setup.md](docs/setup.md) for detailed installation and [docs/api-keys.md](docs/api-keys.md) for provider credentials.
@@ -39,6 +46,7 @@ See [docs/setup.md](docs/setup.md) for detailed installation and [docs/api-keys.
 | **Musixmatch** | Yes — lyrics + metadata |
 | **Last.fm** | Yes |
 | **Spotify** | Yes (Premium on developer account) |
+| **Discogs** | Yes (personal access token) |
 
 By default, only key-free sources are enabled: MusicBrainz, iTunes, and Deezer.
 
@@ -63,12 +71,12 @@ docs/               Extended documentation
 ## Building installers (v1.2.0+)
 
 ```bash
-npm run dist:win    # Windows .exe installer → release/
-npm run dist:mac    # macOS .dmg (on Mac)
-npm run dist:linux  # Linux AppImage + .deb
+pnpm run dist:win    # Windows .exe installer → release/
+pnpm run dist:mac    # macOS .dmg (on Mac)
+pnpm run dist:linux  # Linux AppImage + .deb
 ```
 
-See [docs/setup.md](docs/setup.md) for details. Optional app icon: place a 256×256 PNG at `build-resources/icon.png`.
+See [docs/setup.md](docs/setup.md) for details. The app icon lives in [docs/assets/icon.svg](docs/assets/icon.svg); after editing it, run `pnpm exec electron scripts/generate-icon.js` to regenerate the PNGs (including `build-resources/icon.png`, which electron-builder uses for the installers).
 
 ## Download installers
 
@@ -99,9 +107,9 @@ This project follows [Git Flow](CONTRIBUTING.md#git-flow):
 | `hotfix/*` | Urgent production fixes |
 
 ```bash
-npm run dev      # Electron + Vite dev server
-npm run build    # Production build
-npm run lint     # ESLint
+pnpm dev      # Electron + Vite dev server
+pnpm build    # Production build
+pnpm lint     # ESLint
 ```
 
 ## Documentation

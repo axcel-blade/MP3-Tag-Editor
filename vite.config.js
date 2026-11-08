@@ -12,6 +12,9 @@ const nodeBuiltins = [
   'electron-updater',
   'dotenv',
   'node-id3',
+  // Loads its .wasm from node_modules at runtime, so it must not be bundled.
+  'taglib-wasm',
+  'taglib-wasm/simple',
   ...builtinModules,
   ...builtinModules.map((m) => `node:${m}`),
 ]

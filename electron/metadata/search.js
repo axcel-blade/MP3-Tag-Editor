@@ -6,6 +6,7 @@ import { searchDeezer } from './providers/deezer.js'
 import { searchLastfm } from './providers/lastfm.js'
 import { searchMusixmatch } from './providers/musixmatch.js'
 import { searchSpotify } from './providers/spotify.js'
+import { searchDiscogs } from './providers/discogs.js'
 
 export const PROVIDERS = [
   { name: 'MusicBrainz', key: 'musicbrainz', requiresKey: false },
@@ -14,6 +15,7 @@ export const PROVIDERS = [
   { name: 'Musixmatch', key: 'musixmatch', requiresKey: true },
   { name: 'Last.fm', key: 'lastfm', requiresKey: true },
   { name: 'Spotify', key: 'spotify', requiresKey: true },
+  { name: 'Discogs', key: 'discogs', requiresKey: true },
 ]
 
 /** Providers searched without API keys by default. */
@@ -29,6 +31,8 @@ const SEARCH_HANDLERS = {
   lastfm: (query, tags, limit, config) => searchLastfm(query, tags, config.lastfmApiKey, limit),
   spotify: (query, tags, limit, config) =>
     searchSpotify(query, tags, config.spotifyClientId, config.spotifyClientSecret, limit),
+  discogs: (query, tags, limit, config, userAgent) =>
+    searchDiscogs(query, tags, config.discogsToken, userAgent, limit),
 }
 
 /**

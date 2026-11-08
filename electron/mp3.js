@@ -1,7 +1,7 @@
 import NodeID3 from 'node-id3'
 
 /** ID3 text fields exposed in the UI and write path. */
-const TAG_FIELDS = ['title', 'artist', 'album', 'year', 'genre', 'trackNumber', 'albumArtist']
+const TAG_FIELDS = ['title', 'artist', 'album', 'year', 'genre', 'trackNumber', 'discNumber', 'albumArtist']
 
 /** Encode binary cover art for the renderer (data URLs). */
 function toBase64(data) {
@@ -35,6 +35,7 @@ function normalizeTags(filePath, id3Tags = {}) {
     year: id3Tags.year ?? '',
     genre: id3Tags.genre ?? '',
     trackNumber: id3Tags.trackNumber ?? '',
+    discNumber: id3Tags.partOfSet ?? '',
     albumArtist: id3Tags.performerInfo ?? '',
     lyrics: id3Tags.unsynchronisedLyrics?.text?.trim() ?? '',
     picture: pictureFromNodeId3(id3Tags),
@@ -69,6 +70,7 @@ export async function writeMp3Tags(filePath, fields, includeArtwork, artworkUrl)
   if (fields.year !== undefined) tags.year = fields.year
   if (fields.genre !== undefined) tags.genre = fields.genre
   if (fields.trackNumber !== undefined) tags.trackNumber = fields.trackNumber
+  if (fields.discNumber !== undefined) tags.partOfSet = fields.discNumber
   if (fields.albumArtist !== undefined) tags.performerInfo = fields.albumArtist
 
   if (fields.lyrics !== undefined) {
@@ -98,6 +100,43 @@ export async function writeMp3Tags(filePath, fields, includeArtwork, artworkUrl)
   }
 
   assertWriteResult(NodeID3.update(tags, filePath))
+  return readMp3Tags(filePath)
+}
+
+/** Read the embedded front cover as raw bytes, or null when there is none. */
+export function readCoverImage(filePath) {
+  const image = NodeID3.read(filePath)?.image
+  if (!image?.imageBuffer) return null
+  return { mime: normalizeMime(image.mime), buffer: Buffer.from(image.imageBuffer) }
+}
+
+/** Embed (or replace) the front cover from image bytes. */
+export async function writeCoverImage(filePath, { mime, buffer }) {
+  assertWriteResult(
+    NodeID3.update(
+      {
+        image: {
+          mime: normalizeMime(mime),
+          type: { id: 3, name: 'front cover' },
+          description: 'Album cover',
+          imageBuffer: buffer,
+        },
+      },
+      filePath,
+    ),
+  )
+  return readMp3Tags(filePath)
+}
+
+/**
+ * Remove embedded artwork. node-id3 cannot delete a single frame, so the tag
+ * is read and rewritten without the image (frames node-id3 does not parse are dropped).
+ */
+export async function removeCoverImage(filePath) {
+  const tags = NodeID3.read(filePath, { noRaw: true }) ?? {}
+  if (!tags.image) return readMp3Tags(filePath)
+  delete tags.image
+  assertWriteResult(NodeID3.write(tags, filePath))
   return readMp3Tags(filePath)
 }
 

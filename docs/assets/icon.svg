@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>MP3 Tag Editor</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#26303f"/>
+      <stop offset="1" stop-color="#0d1117"/>
+    </linearGradient>
+    <linearGradient id="tag" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2ee06f"/>
+      <stop offset="1" stop-color="#169c45"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded-square tile -->
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#bg)"/>
+
+  <!-- Price tag, point to the upper left -->
+  <g transform="rotate(45 512 512)">
+    <path d="M318 318 H806 a60 60 0 0 1 60 60 V646 a60 60 0 0 1 -60 60 H318 L136 512 Z"
+          fill="url(#tag)" stroke="#0d1117" stroke-opacity="0.25" stroke-width="6" stroke-linejoin="round"/>
+    <circle cx="248" cy="512" r="40" fill="#121820"/>
+  </g>
+
+  <!-- Beamed eighth notes, upright, centred on the tag body -->
+  <g fill="#ffffff" transform="translate(580 578) scale(0.74) translate(-567 -508)">
+    <polygon points="512,352 724,312 724,376 512,416"/>
+    <rect x="512" y="352" width="30" height="300"/>
+    <rect x="694" y="330" width="30" height="282"/>
+    <ellipse cx="476" cy="652" rx="66" ry="50" transform="rotate(-22 476 652)"/>
+    <ellipse cx="658" cy="612" rx="66" ry="50" transform="rotate(-22 658 612)"/>
+  </g>
+</svg>

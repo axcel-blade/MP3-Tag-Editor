@@ -2,8 +2,9 @@
 
 ## Requirements
 
-- **Node.js** 20.x or later
-- **npm** 10.x or later
+- **Node.js** 22.12 or later
+- **pnpm** 12.x — the exact version is pinned in `package.json` (`packageManager`). Install it with
+  `corepack enable` (Node's built-in Corepack) or `npm install -g pnpm`
 - **Windows**, macOS, or Linux
 
 ## Installation
@@ -11,7 +12,7 @@
 ```bash
 git clone https://github.com/axcel-blade/mp3-tag-editor.git
 cd mp3-tag-editor
-npm install
+pnpm install
 ```
 
 The `postinstall` script runs `scripts/install-electron.js` to ensure Electron binaries are available (especially on Windows).
@@ -37,7 +38,7 @@ See [api-keys.md](api-keys.md) for provider-specific setup.
 ### Development
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Starts the Vite dev server and Electron window with hot reload.
@@ -45,7 +46,7 @@ Starts the Vite dev server and Electron window with hot reload.
 ### Production build
 
 ```bash
-npm run build
+pnpm build
 ```
 
 Output:
@@ -56,7 +57,7 @@ Output:
 ### Lint
 
 ```bash
-npm run lint
+pnpm lint
 ```
 
 ## Building installers
@@ -65,16 +66,16 @@ Package the app for distribution with [electron-builder](https://www.electron.bu
 
 ```bash
 # Current platform
-npm run dist
+pnpm run dist
 
 # Windows (.exe NSIS installer) — run on Windows
-npm run dist:win
+pnpm run dist:win
 
 # macOS (.dmg) — run on macOS
-npm run dist:mac
+pnpm run dist:mac
 
 # Linux (AppImage + .deb) — run on Linux
-npm run dist:linux
+pnpm run dist:linux
 ```
 
 Output goes to the `release/` folder. End users can install without Node.js or npm.
@@ -89,7 +90,7 @@ Output goes to the `release/` folder. End users can install without Node.js or n
 
 ### Electron failed to install
 
-Delete `node_modules/electron` and run `npm install` again, or run:
+Delete `node_modules/electron` and run `pnpm install` again, or run:
 
 ```bash
 node scripts/install-electron.js

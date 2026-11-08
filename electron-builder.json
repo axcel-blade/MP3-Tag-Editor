@@ -12,6 +12,7 @@
     "package.json"
   ],
   "asar": true,
+  "asarUnpack": ["node_modules/taglib-wasm/**"],
   "publish": {
     "provider": "github",
     "owner": "axcel-blade",
