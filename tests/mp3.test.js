@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import NodeID3 from 'node-id3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { readMp3Tags, writeMp3Tags } from '../electron/mp3.js'
+import { readMp3Tags, writeMp3Tags, readCoverImage, writeCoverImage, removeCoverImage } from '../electron/mp3.js'
 
 /** Create a minimal on-disk MP3 with ID3 tags for read/write tests. */
 async function createFixtureMp3(dir, tags = {}) {
@@ -141,5 +141,22 @@ describe('writeMp3Tags', () => {
     ).rejects.toThrow(/Failed to download artwork/)
 
     vi.unstubAllGlobals()
+  })
+
+  it('writes, reads back, and removes a cover image while keeping other tags', async () => {
+    const filePath = await createFixtureMp3(tempDir, { trackNumber: '7', partOfSet: '1/2' })
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4])
+
+    expect(readCoverImage(filePath)).toBeNull()
+
+    const written = await writeCoverImage(filePath, { mime: 'image/png', buffer: png })
+    expect(written.picture?.mime).toBe('image/png')
+    expect(readCoverImage(filePath)?.buffer.equals(png)).toBe(true)
+
+    const removed = await removeCoverImage(filePath)
+    expect(removed.picture).toBeNull()
+    expect(removed.title).toBe('Original Title')
+    expect(removed.trackNumber).toBe('7')
+    expect(removed.discNumber).toBe('1/2')
   })
 })

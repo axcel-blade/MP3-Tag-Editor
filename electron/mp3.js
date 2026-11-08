@@ -103,4 +103,41 @@ export async function writeMp3Tags(filePath, fields, includeArtwork, artworkUrl)
   return readMp3Tags(filePath)
 }
 
+/** Read the embedded front cover as raw bytes, or null when there is none. */
+export function readCoverImage(filePath) {
+  const image = NodeID3.read(filePath)?.image
+  if (!image?.imageBuffer) return null
+  return { mime: normalizeMime(image.mime), buffer: Buffer.from(image.imageBuffer) }
+}
+
+/** Embed (or replace) the front cover from image bytes. */
+export async function writeCoverImage(filePath, { mime, buffer }) {
+  assertWriteResult(
+    NodeID3.update(
+      {
+        image: {
+          mime: normalizeMime(mime),
+          type: { id: 3, name: 'front cover' },
+          description: 'Album cover',
+          imageBuffer: buffer,
+        },
+      },
+      filePath,
+    ),
+  )
+  return readMp3Tags(filePath)
+}
+
+/**
+ * Remove embedded artwork. node-id3 cannot delete a single frame, so the tag
+ * is read and rewritten without the image (frames node-id3 does not parse are dropped).
+ */
+export async function removeCoverImage(filePath) {
+  const tags = NodeID3.read(filePath, { noRaw: true }) ?? {}
+  if (!tags.image) return readMp3Tags(filePath)
+  delete tags.image
+  assertWriteResult(NodeID3.write(tags, filePath))
+  return readMp3Tags(filePath)
+}
+
 export { TAG_FIELDS }

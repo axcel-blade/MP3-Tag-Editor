@@ -4,6 +4,7 @@ import { buildRenameFilename, DEFAULT_RENAME_TEMPLATE, RENAME_PLACEHOLDERS } fro
 import { KEEP_PLACEHOLDER, buildBatchChanges, createBatchDraft, mergeTags } from '@shared/batch-tags.js'
 import { copyTags, findReplaceTags } from '@shared/tag-transforms.js'
 import { autoNumberTracks } from '@shared/auto-number.js'
+import { COVER_SIZE_OPTIONS } from '@shared/cover-image.js'
 import { EXPORT_FORMATS, buildTagExport, filterFiles } from '@shared/tag-export.js'
 import { IGNORE_PLACEHOLDER, compileFilenamePattern, filenameTagChanges } from '@shared/filename-tags.js'
 import { THEME_OPTIONS, applyTheme, normalizeThemeMode } from './theme.js'
@@ -136,6 +137,8 @@ function App() {
   const [tagTool, setTagTool] = useState(null)
   /** Sidebar filter text: plain words or field:value terms. */
   const [fileFilter, setFileFilter] = useState('')
+  /** Max edge (px) when embedding a cover from a file; 0 keeps the original size. */
+  const [coverMaxSize, setCoverMaxSize] = useState(0)
   /** Tags for every listed file, for filtering: { key, tagsByPath } (key ties it to the list + last write). */
   const [libraryTags, setLibraryTags] = useState(null)
   const [toolOptions, setToolOptions] = useState({
@@ -465,6 +468,96 @@ function App() {
       cancelled = true
     }
   }, [filterActive, libraryTagsByPath, filePaths, libraryKey])
+
+  /** Files a cover action applies to: the batch selection, or the open file. */
+  const coverTargets = isBatch ? selectedPaths : filePath ? [filePath] : []
+
+  /** Apply the result of a cover IPC call ({ written, failures }) to UI state. */
+  const applyCoverResult = (result, doneMessage) => {
+    const active = result.written.find((w) => w.filePath === filePath)
+    if (active) setCurrentTags({ ...active.tags, filePath: active.filePath })
+    setUndoPaths(result.written.map((w) => w.filePath))
+    setBatchReloadToken((t) => t + 1)
+    setStatus(`${doneMessage} (${result.written.length} of ${result.written.length + result.failures.length} files, Undo available)`)
+    if (result.failures.length > 0) {
+      setError(result.failures.map((f) => `${basename(f.filePath)}: ${f.error}`).join('; '))
+    }
+  }
+
+  const handleSetCover = async () => {
+    if (coverTargets.length === 0) return
+    setError('')
+    const imagePath = await window.electronAPI.pickCoverImage()
+    if (!imagePath) return
+    setLoading(true)
+    setStatus(`Embedding ${basename(imagePath)}…`)
+    try {
+      const result = await window.electronAPI.setCoverFromFile(coverTargets, imagePath, coverMaxSize)
+      applyCoverResult(result, `Cover set from ${basename(imagePath)} (${result.width}×${result.height})`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRemoveCover = async () => {
+    if (coverTargets.length === 0) return
+    setError('')
+    setLoading(true)
+    try {
+      applyCoverResult(await window.electronAPI.removeCover(coverTargets), 'Cover removed')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleExportCover = async () => {
+    if (!filePath) return
+    setError('')
+    try {
+      const result = await window.electronAPI.exportCover(filePath)
+      if (result?.filePath) {
+        setStatus(`Cover exported to ${basename(result.filePath)}`)
+        window.electronAPI.revealExport?.(result.filePath)
+      }
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const coverControls = (
+    <div className="cover-actions">
+      <button type="button" className="btn btn-secondary btn-sm" onClick={handleSetCover} disabled={loading}>
+        {isBatch ? `Set cover on ${selectedPaths.length} files…` : 'Set cover…'}
+      </button>
+      <select
+        className="theme-select cover-size-select"
+        value={coverMaxSize}
+        onChange={(e) => setCoverMaxSize(Number(e.target.value))}
+        aria-label="Maximum cover size"
+        title="Shrink large images before embedding"
+      >
+        {COVER_SIZE_OPTIONS.map((size) => (
+          <option key={size} value={size}>
+            {size === 0 ? 'Original size' : `Max ${size}px`}
+          </option>
+        ))}
+      </select>
+      {!isBatch && currentTags?.picture?.data && (
+        <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportCover} disabled={loading}>
+          Export cover
+        </button>
+      )}
+      {(isBatch || currentTags?.picture?.data) && (
+        <button type="button" className="btn btn-secondary btn-sm" onClick={handleRemoveCover} disabled={loading}>
+          {isBatch ? 'Remove covers' : 'Remove cover'}
+        </button>
+      )}
+    </div>
+  )
 
   /** Export tags of the selected files (or every visible file) to CSV / HTML / JSON. */
   const handleExport = async (format) => {
@@ -1226,6 +1319,7 @@ function App() {
                   handleBatchSave()
                 }}
               >
+                {coverControls}
                 <p className="settings-hint">
                   Fields showing {KEEP_PLACEHOLDER} differ between files and are left unchanged unless you type a value.
                 </p>
@@ -1329,10 +1423,12 @@ function App() {
                       alt="Current cover"
                       className="cover"
                     />
+                    {!isEditingTags && coverControls}
                   </div>
                 ) : (
                   <div className="cover-wrap">
                     <div className="cover cover-placeholder">No cover</div>
+                    {!isEditingTags && coverControls}
                   </div>
                 )}
                 {isEditingTags && manualDraft ? (

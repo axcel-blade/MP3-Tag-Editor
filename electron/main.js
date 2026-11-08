@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import { APP_DISPLAY_NAME, APP_VERSION } from './constants.js'
 import { initLogger, logger, getLogDirectory, getCurrentLogPath } from './logger.js'
-import { readMp3Tags, writeMp3Tags } from './mp3.js'
+import { readMp3Tags, writeMp3Tags, readCoverImage, writeCoverImage, removeCoverImage } from './mp3.js'
+import { loadCoverFromFile } from './cover.js'
+import { extensionForMime } from '../shared/cover-image.js'
 import { backupMp3File, restoreMp3Backup, clearBackup, transferBackup, configureBackupsRoot } from './backup.js'
 import { getAppSettings, saveAppSettings } from './app-settings.js'
 import { renameMp3File } from './rename.js'
@@ -227,6 +229,67 @@ ipcMain.handle('mp3:rename', async (_event, filePath, template) => {
     logger.error('mp3:rename failed', { file: resolvedFilePath, error: err.message })
     throw err
   }
+})
+
+// --- Cover art ---
+
+/** Back up, then apply a cover change to each file. Keeps going past failures. */
+async function updateCovers(filePaths, label, change) {
+  if (!Array.isArray(filePaths) || filePaths.length === 0) throw new Error('No MP3 files selected')
+  const written = []
+  const failures = []
+  for (const filePath of filePaths) {
+    const resolved = path.resolve(String(filePath))
+    try {
+      await backupMp3File(resolved)
+      const tags = await change(resolved)
+      written.push({ filePath: resolved, tags })
+    } catch (err) {
+      failures.push({ filePath: resolved, error: err.message })
+      logger.error(`${label} failed`, { file: path.basename(resolved), error: err.message })
+    }
+  }
+  logger.info(label, { written: written.length, failed: failures.length })
+  return { written, failures }
+}
+
+ipcMain.handle('cover:pickImage', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose cover image',
+    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png'] }],
+    properties: ['openFile'],
+  })
+  if (result.canceled || result.filePaths.length === 0) return null
+  return result.filePaths[0]
+})
+
+ipcMain.handle('cover:setFromFile', async (_event, filePaths, imagePath, maxEdge) => {
+  if (!imagePath || typeof imagePath !== 'string') throw new Error('No image selected')
+  const cover = await loadCoverFromFile(imagePath, Number(maxEdge) || 0)
+  const result = await updateCovers(filePaths, 'Set cover from file', (file) => writeCoverImage(file, cover))
+  return { ...result, width: cover.width, height: cover.height }
+})
+
+ipcMain.handle('cover:remove', async (_event, filePaths) =>
+  updateCovers(filePaths, 'Removed cover', (file) => removeCoverImage(file)),
+)
+
+ipcMain.handle('cover:export', async (_event, filePath) => {
+  const resolved = path.resolve(String(filePath))
+  const cover = readCoverImage(resolved)
+  if (!cover) throw new Error('This file has no embedded cover')
+
+  const stem = path.basename(resolved, path.extname(resolved))
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Export cover image',
+    defaultPath: path.join(path.dirname(resolved), `${stem} - cover.${extensionForMime(cover.mime)}`),
+    filters: [{ name: 'Image', extensions: [extensionForMime(cover.mime)] }],
+  })
+  if (result.canceled || !result.filePath) return null
+
+  await fs.writeFile(result.filePath, cover.buffer)
+  logger.info('Exported cover', { file: path.basename(result.filePath) })
+  return { filePath: result.filePath }
 })
 
 ipcMain.handle('mp3:undoWrite', async (_event, filePath) => {
