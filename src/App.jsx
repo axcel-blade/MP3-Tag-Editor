@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { buildRenameFilename, DEFAULT_RENAME_TEMPLATE, RENAME_PLACEHOLDERS } from '@shared/rename-template.js'
 import { KEEP_PLACEHOLDER, buildBatchChanges, createBatchDraft, mergeTags } from '@shared/batch-tags.js'
+import { copyTags, findReplaceTags } from '@shared/tag-transforms.js'
 import { THEME_OPTIONS, applyTheme, normalizeThemeMode } from './theme.js'
 import './App.css'
 
@@ -117,6 +118,18 @@ function App() {
   const [batchDraft, setBatchDraft] = useState(null)
   const [batchReloadToken, setBatchReloadToken] = useState(0)
   const [batchKey, setBatchKey] = useState(null)
+  /** Open Find & Replace / Copy Fields tool: { mode: 'replace' | 'copy', entries: [{ path, tags }] | null }. */
+  const [tagTool, setTagTool] = useState(null)
+  const [toolOptions, setToolOptions] = useState({
+    fields: TAG_FIELDS.map(({ key }) => key),
+    find: '',
+    replace: '',
+    useRegex: false,
+    caseSensitive: false,
+    target: 'albumArtist',
+    format: '{artist}',
+    clearSource: false,
+  })
   const [isDragging, setIsDragging] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [logInfo, setLogInfo] = useState(null)
@@ -467,16 +480,11 @@ function App() {
     setBatchDraft((prev) => (prev ? { ...prev, [key]: value } : prev))
   }
 
-  /** Write the edited batch fields to every selected file, one at a time. */
-  const handleBatchSave = async () => {
-    if (!batchLoaded) return
-    const changes = buildBatchChanges(batchDraft, batchMerged)
-    if (Object.keys(changes).length === 0) {
-      setError('No tag changes to save.')
-      return
-    }
-
-    const targets = [...selectedPaths]
+  /**
+   * Write per-file tag changes one file at a time ([{ path, changes }]).
+   * Keeps going past failures, then updates paths, undo, and the active file's tags.
+   */
+  const writeChangesToFiles = async (entries) => {
     const renames = new Map()
     const written = []
     const failures = []
@@ -485,8 +493,8 @@ function App() {
     setLoading(true)
     setError('')
     try {
-      for (const [index, path] of targets.entries()) {
-        setStatus(`Saving tags ${index + 1}/${targets.length}: ${basename(path)}`)
+      for (const [index, { path, changes }] of entries.entries()) {
+        setStatus(`Saving tags ${index + 1}/${entries.length}: ${basename(path)}`)
         try {
           const result = await window.electronAPI.writeMp3Tags(path, changes, false, null)
           const finalPath = result.filePath ?? path
@@ -503,11 +511,75 @@ function App() {
       if (activeTags) setCurrentTags(activeTags)
       setUndoPaths(written)
       setBatchReloadToken((t) => t + 1)
-      setStatus(`Tags saved to ${written.length} of ${targets.length} files (Undo available)`)
+      setStatus(`Tags saved to ${written.length} of ${entries.length} file${entries.length === 1 ? '' : 's'} (Undo available)`)
       if (failures.length > 0) setError(failures.join('; '))
     } finally {
       setLoading(false)
     }
+  }
+
+  /** Write the edited batch fields to every selected file. */
+  const handleBatchSave = async () => {
+    if (!batchLoaded) return
+    const changes = buildBatchChanges(batchDraft, batchMerged)
+    if (Object.keys(changes).length === 0) {
+      setError('No tag changes to save.')
+      return
+    }
+    await writeChangesToFiles(selectedPaths.map((path) => ({ path, changes })))
+  }
+
+  /** Open the Find & Replace / Copy Fields tool for the selected files (or the open file). */
+  const openTagTool = async (mode) => {
+    const targets = selectedPaths.length > 0 ? selectedPaths : filePath ? [filePath] : []
+    if (targets.length === 0) return
+    setError('')
+    setTagTool({ mode, entries: null })
+    try {
+      const tagsList = await Promise.all(targets.map((p) => window.electronAPI.readMp3Tags(p)))
+      setTagTool({ mode, entries: targets.map((path, i) => ({ path, tags: tagsList[i] })) })
+    } catch (err) {
+      setTagTool(null)
+      setError(err.message)
+    }
+  }
+
+  const updateToolOptions = (key, value) => {
+    setToolOptions((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const toggleToolField = (key) => {
+    setToolOptions((prev) => ({
+      ...prev,
+      fields: prev.fields.includes(key) ? prev.fields.filter((k) => k !== key) : [...prev.fields, key],
+    }))
+  }
+
+  /** Live preview of what the active tool would change, per file. */
+  const toolPreview = useMemo(() => {
+    if (!tagTool?.entries) return { rows: [], error: '' }
+    try {
+      const rows = tagTool.entries
+        .map(({ path, tags }) => ({
+          path,
+          tags,
+          changes:
+            tagTool.mode === 'replace'
+              ? findReplaceTags(tags, toolOptions)
+              : copyTags(tags, toolOptions),
+        }))
+        .filter((row) => Object.keys(row.changes).length > 0)
+      return { rows, error: '' }
+    } catch (err) {
+      return { rows: [], error: err.message }
+    }
+  }, [tagTool, toolOptions])
+
+  const handleApplyTagTool = async () => {
+    if (toolPreview.rows.length === 0) return
+    const entries = toolPreview.rows.map(({ path, changes }) => ({ path, changes }))
+    setTagTool(null)
+    await writeChangesToFiles(entries)
   }
 
   const applyWriteResult = useCallback(
@@ -944,6 +1016,12 @@ function App() {
               <h2>Batch Edit</h2>
               <span className="file-count">{selectedPaths.length} files</span>
               <div className="tag-edit-actions">
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('replace')} disabled={loading}>
+                  Find &amp; Replace
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('copy')} disabled={loading}>
+                  Copy Fields
+                </button>
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
@@ -1012,6 +1090,16 @@ function App() {
               <h2>Current Tags</h2>
               {currentTags && (
                 <div className="tag-edit-actions">
+                  {!isEditingTags && (
+                    <>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('replace')} disabled={loading}>
+                        Find &amp; Replace
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('copy')} disabled={loading}>
+                        Copy Fields
+                      </button>
+                    </>
+                  )}
                   {!isEditingTags ? (
                     <button
                       type="button"
@@ -1335,6 +1423,184 @@ function App() {
                 </button>
                 <button type="button" className="btn btn-primary" onClick={handleApplyTags} disabled={loading}>
                   Apply Selected Tags
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {tagTool &&
+        createPortal(
+          <div className="modal-overlay" onClick={() => setTagTool(null)} role="presentation">
+            <div
+              className="apply-modal tag-tool-modal"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="tag-tool-title"
+            >
+              <div className="apply-modal-header">
+                <h2 id="tag-tool-title">{tagTool.mode === 'replace' ? 'Find & Replace' : 'Copy Fields'}</h2>
+                <button type="button" className="modal-close" onClick={() => setTagTool(null)} aria-label="Close">
+                  ×
+                </button>
+              </div>
+              <div className="source-filters">
+                <button
+                  type="button"
+                  className={`source-chip ${tagTool.mode === 'replace' ? 'active' : ''}`}
+                  onClick={() => setTagTool((t) => ({ ...t, mode: 'replace' }))}
+                >
+                  Find &amp; Replace
+                </button>
+                <button
+                  type="button"
+                  className={`source-chip ${tagTool.mode === 'copy' ? 'active' : ''}`}
+                  onClick={() => setTagTool((t) => ({ ...t, mode: 'copy' }))}
+                >
+                  Copy Fields
+                </button>
+                <span className="muted">
+                  {tagTool.entries
+                    ? `${tagTool.entries.length} file${tagTool.entries.length === 1 ? '' : 's'}`
+                    : 'Reading tags…'}
+                </span>
+              </div>
+
+              {tagTool.mode === 'replace' ? (
+                <div className="tag-tool-form">
+                  <label>
+                    Find
+                    <input
+                      type="text"
+                      value={toolOptions.find}
+                      onChange={(e) => updateToolOptions('find', e.target.value)}
+                      autoFocus
+                    />
+                  </label>
+                  <label>
+                    Replace with
+                    <input
+                      type="text"
+                      value={toolOptions.replace}
+                      onChange={(e) => updateToolOptions('replace', e.target.value)}
+                    />
+                  </label>
+                  <div className="tag-tool-options">
+                    <label className="settings-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={toolOptions.useRegex}
+                        onChange={(e) => updateToolOptions('useRegex', e.target.checked)}
+                      />
+                      <span>Regular expression ($1, $2… in replacement)</span>
+                    </label>
+                    <label className="settings-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={toolOptions.caseSensitive}
+                        onChange={(e) => updateToolOptions('caseSensitive', e.target.checked)}
+                      />
+                      <span>Match case</span>
+                    </label>
+                  </div>
+                  <div className="tag-tool-options">
+                    <span className="search-sources-label">In fields</span>
+                    {TAG_FIELDS.map(({ key, label }) => (
+                      <label key={key} className="settings-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={toolOptions.fields.includes(key)}
+                          onChange={() => toggleToolField(key)}
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="tag-tool-form">
+                  <label>
+                    Target field
+                    <select
+                      className="theme-select"
+                      value={toolOptions.target}
+                      onChange={(e) => updateToolOptions('target', e.target.value)}
+                    >
+                      {TAG_FIELDS.map(({ key, label }) => (
+                        <option key={key} value={key}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Value format
+                    <input
+                      type="text"
+                      value={toolOptions.format}
+                      onChange={(e) => updateToolOptions('format', e.target.value)}
+                      placeholder="{artist}"
+                    />
+                  </label>
+                  <p className="settings-hint">
+                    Placeholders: {TAG_FIELDS.map(({ key }) => `{${key}}`).join(', ')} — combine them, e.g.{' '}
+                    <code>{'{artist} - {album}'}</code>
+                  </p>
+                  <label className="settings-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={toolOptions.clearSource}
+                      onChange={(e) => updateToolOptions('clearSource', e.target.checked)}
+                    />
+                    <span>Move (clear the source fields afterwards)</span>
+                  </label>
+                </div>
+              )}
+
+              <div className="tag-tool-preview">
+                {toolPreview.error ? (
+                  <p className="placeholder">{toolPreview.error}</p>
+                ) : !tagTool.entries ? null : toolPreview.rows.length === 0 ? (
+                  <p className="placeholder">No changes</p>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>File</th>
+                        <th>Field</th>
+                        <th>Before</th>
+                        <th>After</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {toolPreview.rows.flatMap(({ path, tags, changes }) =>
+                        Object.entries(changes).map(([key, value]) => (
+                          <tr key={`${path}:${key}`}>
+                            <td title={path}>{basename(path)}</td>
+                            <td>{TAG_FIELDS.find((f) => f.key === key)?.label ?? key}</td>
+                            <td className="muted">{tags[key] || '—'}</td>
+                            <td>{value || '—'}</td>
+                          </tr>
+                        )),
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <div className="apply-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setTagTool(null)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleApplyTagTool}
+                  disabled={loading || toolPreview.rows.length === 0}
+                >
+                  Apply to {toolPreview.rows.length} file{toolPreview.rows.length === 1 ? '' : 's'}
                 </button>
               </div>
             </div>
