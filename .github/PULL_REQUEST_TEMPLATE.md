@@ -16,8 +16,8 @@
 
 ## Test plan
 
-- [ ] `npm run lint` passes
-- [ ] `npm run build` passes
+- [ ] `pnpm lint` passes
+- [ ] `pnpm build` passes
 - [ ] Tested manually in Electron dev mode
 - [ ] Updated CHANGELOG.md (if user-facing)
 

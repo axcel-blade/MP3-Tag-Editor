@@ -27,7 +27,7 @@ Ensure **Album Artwork** is checked in the Apply Tags modal before clicking **Ap
 
 ### App won't start on Windows
 
-Run `npm install` again — the postinstall script downloads Electron. See [docs/setup.md](docs/setup.md).
+Run `pnpm install` again — the postinstall script downloads Electron. See [docs/setup.md](docs/setup.md).
 
 ### Log files
 

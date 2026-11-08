@@ -29,9 +29,9 @@ Electron desktop app that reads audio tags (MP3, FLAC, M4A, Ogg, Opus, WAV, AIFF
 ```bash
 git clone https://github.com/axcel-blade/mp3-tag-editor.git
 cd mp3-tag-editor
-npm install
+pnpm install
 copy .env.example .env   # optional API keys
-npm run dev
+pnpm dev
 ```
 
 See [docs/setup.md](docs/setup.md) for detailed installation and [docs/api-keys.md](docs/api-keys.md) for provider credentials.
@@ -71,12 +71,12 @@ docs/               Extended documentation
 ## Building installers (v1.2.0+)
 
 ```bash
-npm run dist:win    # Windows .exe installer → release/
-npm run dist:mac    # macOS .dmg (on Mac)
-npm run dist:linux  # Linux AppImage + .deb
+pnpm run dist:win    # Windows .exe installer → release/
+pnpm run dist:mac    # macOS .dmg (on Mac)
+pnpm run dist:linux  # Linux AppImage + .deb
 ```
 
-See [docs/setup.md](docs/setup.md) for details. The app icon lives in [docs/assets/icon.svg](docs/assets/icon.svg); after editing it, run `npx electron scripts/generate-icon.js` to regenerate the PNGs (including `build-resources/icon.png`, which electron-builder uses for the installers).
+See [docs/setup.md](docs/setup.md) for details. The app icon lives in [docs/assets/icon.svg](docs/assets/icon.svg); after editing it, run `pnpm exec electron scripts/generate-icon.js` to regenerate the PNGs (including `build-resources/icon.png`, which electron-builder uses for the installers).
 
 ## Download installers
 
@@ -107,9 +107,9 @@ This project follows [Git Flow](CONTRIBUTING.md#git-flow):
 | `hotfix/*` | Urgent production fixes |
 
 ```bash
-npm run dev      # Electron + Vite dev server
-npm run build    # Production build
-npm run lint     # ESLint
+pnpm dev      # Electron + Vite dev server
+pnpm build    # Production build
+pnpm lint     # ESLint
 ```
 
 ## Documentation

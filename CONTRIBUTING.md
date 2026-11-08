@@ -31,9 +31,9 @@ hotfix/*      Critical fixes applied directly to main
 ## Development setup
 
 ```bash
-npm install
+pnpm install
 copy .env.example .env
-npm run dev
+pnpm dev
 ```
 
 ## Code guidelines
@@ -42,7 +42,7 @@ npm run dev
 - Add brief comments for non-obvious logic (IPC handlers, ID3 edge cases, provider quirks)
 - Keep commits focused and descriptive
 - Update `CHANGELOG.md` for user-facing changes
-- Bump version in `package.json`, `package-lock.json`, and `electron/constants.js` consumers when releasing
+- Bump version in `package.json` (and refresh `pnpm-lock.yaml` with `pnpm install`) and `electron/constants.js` consumers when releasing
 
 ## Commit messages
 
@@ -58,7 +58,7 @@ Update README for v1.1.0 release
 
 - Fill out the PR template completely
 - Link related issues
-- Ensure `npm run build` and `npm run lint` pass
+- Ensure `pnpm build` and `pnpm lint` pass
 - Do not add bots or AI tools as co-authors on commits
 
 ## Reporting issues

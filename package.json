@@ -11,6 +11,7 @@
   "description": "Electron desktop app to read, search, and write MP3 ID3 tags from multiple metadata sources",
   "main": "dist-electron/main.js",
   "type": "module",
+  "packageManager": "pnpm@12.16.1",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -21,10 +22,10 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dist": "npm run build && electron-builder --config electron-builder.json --publish never",
-    "dist:win": "npm run build && electron-builder --config electron-builder.json --win --publish never",
-    "dist:mac": "npm run build && electron-builder --config electron-builder.json --mac --publish never",
-    "dist:linux": "npm run build && electron-builder --config electron-builder.json --linux --publish never",
+    "dist": "pnpm run build && electron-builder --config electron-builder.json --publish never",
+    "dist:win": "pnpm run build && electron-builder --config electron-builder.json --win --publish never",
+    "dist:mac": "pnpm run build && electron-builder --config electron-builder.json --mac --publish never",
+    "dist:linux": "pnpm run build && electron-builder --config electron-builder.json --linux --publish never",
     "postinstall": "node scripts/install-electron.js"
   },
   "dependencies": {

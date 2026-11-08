@@ -6,7 +6,7 @@
  *   public/favicon.svg              copy of the SVG (renderer favicon)
  *
  * Uses Electron's offscreen renderer, so no extra image dependencies are needed.
- * Run after editing the SVG:  npx electron scripts/generate-icon.js
+ * Run after editing the SVG:  pnpm exec electron scripts/generate-icon.js
  */
 import fs from 'node:fs'
 import path from 'node:path'
