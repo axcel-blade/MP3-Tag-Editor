@@ -51,8 +51,11 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Cache Electron binaries
-        uses: actions/cache@v4
+      # restore/save are split so a successful download is cached even when a
+      # later step fails, letting reruns skip GitHub Releases entirely.
+      - name: Restore Electron binaries
+        id: electron-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ${{ runner.temp }}/electron-cache
@@ -60,16 +63,14 @@ jobs:
           key: electron-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: electron-${{ runner.os }}-
 
-      # The Electron postinstall downloads its binary from GitHub Releases, which
-      # occasionally returns 504s. Retry the install a few times before failing.
+      # electron-builder fetches its own Electron copy when packaging, so the
+      # postinstall download is redundant here and only adds a failure point.
       - name: Install dependencies
         shell: bash
         env:
-          ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
-          electron_config_cache: ${{ runner.temp }}/electron-cache
-          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
         run: |
-          for attempt in 1 2 3 4; do
+          for attempt in 1 2 3; do
             pnpm install --frozen-lockfile && exit 0
             echo "pnpm install failed (attempt $attempt), retrying in $((attempt * 20))s..."
             sleep $((attempt * 20))
@@ -84,12 +85,22 @@ jobs:
         # electron-builder downloads Electron and packaging tools from GitHub
         # Releases, which intermittently returns 504s. Retry before failing.
         run: |
-          for attempt in 1 2 3 4; do
+          for attempt in 1 2 3 4 5; do
             pnpm run ${{ matrix.script }} && exit 0
-            echo "Build failed (attempt $attempt), retrying in $((attempt * 30))s..."
-            sleep $((attempt * 30))
+            [ "$attempt" -lt 5 ] || break
+            echo "Build failed (attempt $attempt), retrying in $((attempt * 60))s..."
+            sleep $((attempt * 60))
           done
           exit 1
+
+      - name: Save Electron binaries
+        if: always() && steps.electron-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ runner.temp }}/electron-cache
+            ${{ runner.temp }}/electron-builder-cache
+          key: electron-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: List release output
         shell: bash
