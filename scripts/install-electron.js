@@ -8,7 +8,7 @@ const electronDir = path.join(__dirname, '..', 'node_modules', 'electron')
 const pathFile = path.join(electronDir, 'path.txt')
 const distDir = path.join(electronDir, 'dist')
 
-if (process.env.SKIP_ELECTRON_BINARY === '1') {
+if (process.env.SKIP_ELECTRON_BINARY === '1' || process.env.ELECTRON_SKIP_BINARY_DOWNLOAD === '1') {
   process.exit(0)
 }
 
