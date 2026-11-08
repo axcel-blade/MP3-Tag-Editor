@@ -57,7 +57,8 @@ export function buildRenameFilename(template, tags, originalBaseName = 'song', o
   const maxStemLength = options.maxStemLength ?? MAX_FILENAME_STEM_LENGTH
   const raw = applyRenameTemplate(template || DEFAULT_RENAME_TEMPLATE, tags, originalBaseName)
   const stem = truncateFilenameStem(sanitizeFilename(raw) || originalBaseName, maxStemLength)
-  return `${stem}.mp3`
+  const extension = String(options.extension || 'mp3').replace(/^\./, '')
+  return `${stem}.${extension}`
 }
 
 export const RENAME_PLACEHOLDERS = [

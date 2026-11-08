@@ -4,11 +4,12 @@
 [![CI](https://github.com/axcel-blade/mp3-tag-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/axcel-blade/mp3-tag-editor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Electron desktop app that reads MP3 ID3 tags, searches multiple metadata APIs in parallel, and lets you selectively apply tags—including lyrics and album artwork—back to your files.
+Electron desktop app that reads audio tags (MP3, FLAC, M4A, Ogg, Opus, WAV, AIFF), searches multiple metadata APIs in parallel, and lets you selectively apply tags—including lyrics and album artwork—back to your files.
 
 ## Features
 
-- Open a single MP3 or an entire folder (recursive scan)
+- Open a single audio file or an entire folder (recursive scan)
+- Formats: MP3 (ID3v2 via node-id3) plus FLAC, M4A/M4B, Ogg Vorbis, Opus, WAV and AIFF (via TagLib / taglib-wasm)
 - Read current tags and embedded cover art
 - Search MusicBrainz, iTunes, Deezer, Musixmatch, Last.fm, and Spotify
 - Filter results by source; choose which providers to query

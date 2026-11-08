@@ -29,6 +29,16 @@ describe('findMp3Files', () => {
     expect(paths[1]).toContain('b.MP3')
   })
 
+  it('also finds other supported audio formats', async () => {
+    await writeFile(join(tempDir, 'a.flac'), 'a')
+    await writeFile(join(tempDir, 'b.M4A'), 'b')
+    await writeFile(join(tempDir, 'c.ogg'), 'c')
+    await writeFile(join(tempDir, 'cover.jpg'), 'img')
+
+    const paths = await findMp3Files(tempDir)
+    expect(paths.map((p) => p.split(/[/\\]/).pop())).toEqual(['a.flac', 'b.M4A', 'c.ogg'])
+  })
+
   it('returns paths sorted case-insensitively by full path', async () => {
     await writeFile(join(tempDir, 'z.mp3'), 'z')
     await writeFile(join(tempDir, 'a.mp3'), 'a')

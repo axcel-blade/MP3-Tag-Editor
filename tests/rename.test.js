@@ -53,6 +53,11 @@ describe('maxStemLengthForDir', () => {
 })
 
 describe('buildRenameFilename', () => {
+  it('keeps the given extension', () => {
+    expect(buildRenameFilename('{title}', { title: 'Song' }, 'old', { extension: '.flac' })).toBe('Song.flac')
+    expect(buildRenameFilename('{title}', { title: 'Song' }, 'old', { extension: 'm4a' })).toBe('Song.m4a')
+  })
+
   it('appends .mp3 extension', () => {
     expect(
       buildRenameFilename('{artist} - {title}', { artist: 'A', title: 'B' }, 'old'),

@@ -5,6 +5,7 @@ import { KEEP_PLACEHOLDER, buildBatchChanges, createBatchDraft, mergeTags } from
 import { copyTags, findReplaceTags } from '@shared/tag-transforms.js'
 import { autoNumberTracks } from '@shared/auto-number.js'
 import { COVER_SIZE_OPTIONS } from '@shared/cover-image.js'
+import { extensionOf, isSupportedAudio, stemOf } from '@shared/audio-formats.js'
 import { EXPORT_FORMATS, buildTagExport, filterFiles } from '@shared/tag-export.js'
 import { IGNORE_PLACEHOLDER, compileFilenamePattern, filenameTagChanges } from '@shared/filename-tags.js'
 import { THEME_OPTIONS, applyTheme, normalizeThemeMode } from './theme.js'
@@ -346,7 +347,7 @@ function App() {
     setFolderPath(result.type === 'folder' ? result.folderPath : null)
 
     if (result.type === 'folder') {
-      setStatus(`Found ${result.paths.length} MP3 file${result.paths.length === 1 ? '' : 's'}`)
+      setStatus(`Found ${result.paths.length} audio file${result.paths.length === 1 ? '' : 's'}`)
     }
 
     await loadFile(result.paths[0])
@@ -361,7 +362,7 @@ function App() {
     const result = await window.electronAPI.openMp3Folder()
     if (!result) return
     if (result.paths.length === 0) {
-      setError('No MP3 files found in the selected folder.')
+      setError('No supported audio files found in the selected folder.')
       setFilePaths([])
       setFolderPath(result.folderPath)
       setFilePath(null)
@@ -748,7 +749,9 @@ function App() {
           case 'filename':
             return filenameTagChanges(compiled, path, tags)
           case 'rename': {
-            const next = buildRenameFilename(toolOptions.renameTemplate, tags, basename(path).replace(/\.mp3$/i, ''))
+            const next = buildRenameFilename(toolOptions.renameTemplate, tags, stemOf(path), {
+              extension: extensionOf(path),
+            })
             return next === basename(path) ? {} : { fileName: next }
           }
           default:
@@ -884,7 +887,7 @@ function App() {
     }
   }
 
-  /** Write checked fields (and optional artwork/lyrics) to the open MP3 file. */
+  /** Write checked fields (and optional artwork/lyrics) to the open audio file. */
   const handleApplyTags = async () => {
     if (!filePath || !selectedTrack) return
 
@@ -969,7 +972,7 @@ function App() {
     }
   }
 
-  /** Open dropped MP3 file(s) from the desktop (Electron exposes file.path). */
+  /** Open dropped audio file(s) from the desktop (Electron exposes file.path). */
   const handleDrop = useCallback(async (e) => {
     e.preventDefault()
     e.stopPropagation()
@@ -977,10 +980,10 @@ function App() {
 
     const paths = [...e.dataTransfer.files]
       .map((file) => file.path)
-      .filter((p) => p && p.toLowerCase().endsWith('.mp3'))
+      .filter((p) => p && isSupportedAudio(p))
 
     if (paths.length === 0) {
-      setError('Drop one or more .mp3 files')
+      setError('Drop one or more audio files (MP3, FLAC, M4A, Ogg, Opus, WAV, AIFF)')
       return
     }
 
@@ -994,7 +997,7 @@ function App() {
     setFilePaths(paths)
 
     if (paths.length > 1) {
-      setStatus(`Loaded ${paths.length} dropped MP3 files`)
+      setStatus(`Loaded ${paths.length} dropped audio files`)
     }
 
     await loadFile(paths[0])
@@ -1064,10 +1067,10 @@ function App() {
   const showUpdateBanner = ['available', 'downloading', 'downloaded', 'error'].includes(updateInfo.status)
 
   const renamePreview = useMemo(() => {
-    const sampleBase = currentTags?.fileName
-      ? currentTags.fileName.replace(/\.mp3$/i, '')
-      : 'song'
-    return buildRenameFilename(appSettings.renameTemplate, currentTags ?? SAMPLE_TAGS_FOR_PREVIEW, sampleBase)
+    const sampleBase = currentTags?.fileName ? stemOf(currentTags.fileName) : 'song'
+    return buildRenameFilename(appSettings.renameTemplate, currentTags ?? SAMPLE_TAGS_FOR_PREVIEW, sampleBase, {
+      extension: currentTags?.fileName ? extensionOf(currentTags.fileName) : 'mp3',
+    })
   }, [appSettings.renameTemplate, currentTags])
 
   const showFileList = filePaths.length > 0 && (folderPath != null || filePaths.length > 1)
@@ -1087,7 +1090,7 @@ function App() {
     >
       {isDragging && (
         <div className="drop-overlay" aria-hidden="true">
-          <p>Drop MP3 files here</p>
+          <p>Drop audio files here</p>
         </div>
       )}
       <header className="header">
@@ -1412,7 +1415,7 @@ function App() {
               )}
             </div>
             {!currentTags ? (
-              <p className="placeholder">Open an MP3 file, folder, or drag &amp; drop files here</p>
+              <p className="placeholder">Open an audio file (MP3, FLAC, M4A, Ogg…), a folder, or drag &amp; drop files here</p>
             ) : (
               <div className="current-tags-body">
                 <div className="tags-grid">
@@ -2014,7 +2017,7 @@ function App() {
               <fieldset className="settings-section">
                 <legend>Auto file rename</legend>
                 <p className="modal-desc">
-                  After applying tags, rename the MP3 using a custom template. Off by default.
+                  After applying tags, rename the file using a custom template. Off by default.
                 </p>
                 <label className="settings-checkbox">
                   <input

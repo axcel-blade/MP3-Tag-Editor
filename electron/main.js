@@ -5,13 +5,14 @@ import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import { APP_DISPLAY_NAME, APP_VERSION } from './constants.js'
 import { initLogger, logger, getLogDirectory, getCurrentLogPath } from './logger.js'
-import { readMp3Tags, writeMp3Tags, readCoverImage, writeCoverImage, removeCoverImage } from './mp3.js'
+import { readAudioTags, writeAudioTags, readAudioCover, writeAudioCover, removeAudioCover } from './audio.js'
+import { AUDIO_EXTENSIONS } from '../shared/audio-formats.js'
 import { loadCoverFromFile } from './cover.js'
 import { extensionForMime } from '../shared/cover-image.js'
 import { backupMp3File, restoreMp3Backup, clearBackup, transferBackup, configureBackupsRoot } from './backup.js'
 import { getAppSettings, saveAppSettings } from './app-settings.js'
 import { renameMp3File } from './rename.js'
-import { findMp3Files } from './files.js'
+import { findAudioFiles } from './files.js'
 import { searchAllMetadata } from './metadata/search.js'
 import { getApiConfig, saveApiConfig } from './metadata/config.js'
 import {
@@ -83,8 +84,8 @@ app.on('window-all-closed', () => {
 
 ipcMain.handle('dialog:openMp3', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Select MP3 file',
-    filters: [{ name: 'MP3 Files', extensions: ['mp3'] }],
+    title: 'Select audio file',
+    filters: [{ name: 'Audio Files', extensions: AUDIO_EXTENSIONS }],
     properties: ['openFile'],
   })
   if (result.canceled || result.filePaths.length === 0) return null
@@ -93,13 +94,13 @@ ipcMain.handle('dialog:openMp3', async () => {
 
 ipcMain.handle('dialog:openFolder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Select folder with MP3 files',
+    title: 'Select folder with audio files',
     properties: ['openDirectory'],
   })
   if (result.canceled || result.filePaths.length === 0) return null
 
   const folderPath = result.filePaths[0]
-  const paths = await findMp3Files(folderPath)
+  const paths = await findAudioFiles(folderPath)
   return { type: 'folder', folderPath, paths }
 })
 
@@ -160,7 +161,7 @@ ipcMain.handle('metadata:searchCustom', async (_event, query, providers) => {
 
 ipcMain.handle('mp3:readTags', async (_event, filePath) => {
   try {
-    const tags = await readMp3Tags(filePath)
+    const tags = await readAudioTags(filePath)
     logger.info('Read MP3 tags', { file: path.basename(filePath) })
     return tags
   } catch (err) {
@@ -176,7 +177,7 @@ ipcMain.handle('mp3:writeTags', async (_event, filePath, fields, includeArtwork,
   const resolvedFilePath = path.resolve(filePath)
   try {
     const backupPath = await backupMp3File(resolvedFilePath)
-    let tags = await writeMp3Tags(resolvedFilePath, fields, includeArtwork, artworkUrl)
+    let tags = await writeAudioTags(resolvedFilePath, fields, includeArtwork, artworkUrl)
     let finalPath = resolvedFilePath
     let renameWarning = null
 
@@ -187,7 +188,7 @@ ipcMain.handle('mp3:writeTags', async (_event, filePath, fields, includeArtwork,
         if (renamedPath !== resolvedFilePath) {
           transferBackup(resolvedFilePath, renamedPath)
           finalPath = renamedPath
-          tags = await readMp3Tags(finalPath)
+          tags = await readAudioTags(finalPath)
           logger.info('File renamed after tag write', { from: path.basename(resolvedFilePath), to: path.basename(finalPath) })
         }
       } catch (renameErr) {
@@ -218,7 +219,7 @@ ipcMain.handle('mp3:rename', async (_event, filePath, template) => {
   }
   const resolvedFilePath = path.resolve(filePath)
   try {
-    const tags = await readMp3Tags(resolvedFilePath)
+    const tags = await readAudioTags(resolvedFilePath)
     const renamedPath = await renameMp3File(resolvedFilePath, tags, template)
     if (renamedPath !== resolvedFilePath) {
       transferBackup(resolvedFilePath, renamedPath)
@@ -266,17 +267,17 @@ ipcMain.handle('cover:pickImage', async () => {
 ipcMain.handle('cover:setFromFile', async (_event, filePaths, imagePath, maxEdge) => {
   if (!imagePath || typeof imagePath !== 'string') throw new Error('No image selected')
   const cover = await loadCoverFromFile(imagePath, Number(maxEdge) || 0)
-  const result = await updateCovers(filePaths, 'Set cover from file', (file) => writeCoverImage(file, cover))
+  const result = await updateCovers(filePaths, 'Set cover from file', (file) => writeAudioCover(file, cover))
   return { ...result, width: cover.width, height: cover.height }
 })
 
 ipcMain.handle('cover:remove', async (_event, filePaths) =>
-  updateCovers(filePaths, 'Removed cover', (file) => removeCoverImage(file)),
+  updateCovers(filePaths, 'Removed cover', (file) => removeAudioCover(file)),
 )
 
 ipcMain.handle('cover:export', async (_event, filePath) => {
   const resolved = path.resolve(String(filePath))
-  const cover = readCoverImage(resolved)
+  const cover = await readAudioCover(resolved)
   if (!cover) throw new Error('This file has no embedded cover')
 
   const stem = path.basename(resolved, path.extname(resolved))
@@ -298,7 +299,7 @@ ipcMain.handle('mp3:undoWrite', async (_event, filePath) => {
     const restoredPath = await restoreMp3Backup(resolvedFilePath)
     clearBackup(restoredPath)
     logger.info('Undid tag write', { file: path.basename(restoredPath) })
-    const tags = await readMp3Tags(restoredPath)
+    const tags = await readAudioTags(restoredPath)
     return { ...tags, filePath: restoredPath }
   } catch (err) {
     logger.error('mp3:undoWrite failed', { file: resolvedFilePath, error: err.message })
