@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { buildRenameFilename, DEFAULT_RENAME_TEMPLATE, RENAME_PLACEHOLDERS } from '@shared/rename-template.js'
+import { KEEP_PLACEHOLDER, buildBatchChanges, createBatchDraft, mergeTags } from '@shared/batch-tags.js'
 import { THEME_OPTIONS, applyTheme, normalizeThemeMode } from './theme.js'
 import './App.css'
 
@@ -107,7 +108,15 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
-  const [canUndo, setCanUndo] = useState(false)
+  /** Files written by the last save (one file, or every file in a batch). */
+  const [undoPaths, setUndoPaths] = useState([])
+  const canUndo = undoPaths.length > 0
+  /** Files selected in the sidebar; more than one switches to batch editing. */
+  const [selectedPaths, setSelectedPaths] = useState([])
+  const [batchMerged, setBatchMerged] = useState(null)
+  const [batchDraft, setBatchDraft] = useState(null)
+  const [batchReloadToken, setBatchReloadToken] = useState(0)
+  const [batchKey, setBatchKey] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [logInfo, setLogInfo] = useState(null)
@@ -255,12 +264,13 @@ function App() {
   const loadFile = useCallback(async (path) => {
     setError('')
     resetSelection()
-    setCanUndo(false)
+    setUndoPaths([])
     setIsEditingTags(false)
     setManualDraft(null)
     setMetadataResults([])
     setProviderErrors([])
     setFilePath(path)
+    setSelectedPaths([path])
 
     if (searchProviders.length === 0) {
       setError('Select at least one source to search.')
@@ -373,9 +383,136 @@ function App() {
     )
   }, [])
 
+  /** Apply a map of old → new paths (from auto-rename or undo) to the file list and selection. */
+  const applyPathRenames = useCallback((renames) => {
+    if (renames.size === 0) return
+    const mapPath = (p) => renames.get(p) ?? p
+    setFilePaths((prev) => prev.map(mapPath))
+    setSelectedPaths((prev) => prev.map(mapPath))
+    setFilePath((prev) => (prev ? mapPath(prev) : prev))
+  }, [])
+
+  const isBatch = selectedPaths.length > 1
+  const selectionKey = selectedPaths.join('|')
+  // Merged tags are only valid for the selection they were read from.
+  const batchLoaded = isBatch && batchKey === selectionKey && batchDraft != null
+
+  /** Sidebar click: plain click opens one file, Ctrl/Cmd toggles, Shift selects a range. */
+  const handleFileClick = (e, path) => {
+    if (loading) return
+
+    if (e.ctrlKey || e.metaKey) {
+      const base = selectedPaths.length > 0 ? selectedPaths : filePath ? [filePath] : []
+      const next = base.includes(path) ? base.filter((p) => p !== path) : [...base, path]
+      if (next.length === 0) return
+      if (next.length === 1) {
+        if (next[0] === filePath) setSelectedPaths(next)
+        else loadFile(next[0])
+        return
+      }
+      setSelectedPaths(filePaths.filter((p) => next.includes(p)))
+      return
+    }
+
+    if (e.shiftKey && filePath) {
+      const from = filePaths.indexOf(filePath)
+      const to = filePaths.indexOf(path)
+      if (from !== -1 && to !== -1) {
+        const [lo, hi] = from < to ? [from, to] : [to, from]
+        const range = filePaths.slice(lo, hi + 1)
+        if (range.length > 1) {
+          setSelectedPaths(range)
+          return
+        }
+      }
+    }
+
+    if (path === filePath) {
+      setSelectedPaths([path])
+      return
+    }
+    handleSelectFile(path)
+  }
+
+  const handleSelectAll = () => {
+    if (filePaths.length > 1) setSelectedPaths(filePaths)
+  }
+
+  const handleClearSelection = () => {
+    if (filePath) setSelectedPaths([filePath])
+  }
+
+  // Load and merge tags whenever the batch selection changes.
+  useEffect(() => {
+    if (selectedPaths.length < 2) return undefined
+
+    let cancelled = false
+    Promise.all(selectedPaths.map((p) => window.electronAPI.readMp3Tags(p)))
+      .then((tagsList) => {
+        if (cancelled) return
+        const merged = mergeTags(tagsList, TAG_FIELDS.map(({ key }) => key))
+        setBatchMerged(merged)
+        setBatchDraft(createBatchDraft(merged))
+        setBatchKey(selectionKey)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedPaths, selectionKey, batchReloadToken])
+
+  const updateBatchDraft = (key, value) => {
+    setBatchDraft((prev) => (prev ? { ...prev, [key]: value } : prev))
+  }
+
+  /** Write the edited batch fields to every selected file, one at a time. */
+  const handleBatchSave = async () => {
+    if (!batchLoaded) return
+    const changes = buildBatchChanges(batchDraft, batchMerged)
+    if (Object.keys(changes).length === 0) {
+      setError('No tag changes to save.')
+      return
+    }
+
+    const targets = [...selectedPaths]
+    const renames = new Map()
+    const written = []
+    const failures = []
+    let activeTags = null
+
+    setLoading(true)
+    setError('')
+    try {
+      for (const [index, path] of targets.entries()) {
+        setStatus(`Saving tags ${index + 1}/${targets.length}: ${basename(path)}`)
+        try {
+          const result = await window.electronAPI.writeMp3Tags(path, changes, false, null)
+          const finalPath = result.filePath ?? path
+          if (finalPath !== path) renames.set(path, finalPath)
+          written.push(finalPath)
+          if (path === filePath) activeTags = { ...result.tags, filePath: finalPath }
+          if (result.renameWarning) failures.push(`${basename(path)}: rename skipped (${result.renameWarning})`)
+        } catch (err) {
+          failures.push(`${basename(path)}: ${err.message}`)
+        }
+      }
+
+      applyPathRenames(renames)
+      if (activeTags) setCurrentTags(activeTags)
+      setUndoPaths(written)
+      setBatchReloadToken((t) => t + 1)
+      setStatus(`Tags saved to ${written.length} of ${targets.length} files (Undo available)`)
+      if (failures.length > 0) setError(failures.join('; '))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const applyWriteResult = useCallback(
     (result, pathBeforeWrite, statusMessage) => {
-      setCanUndo(true)
+      setUndoPaths([result.filePath ?? pathBeforeWrite])
       if (result.filePath && result.filePath !== pathBeforeWrite) {
         replaceSelectedFilePath(pathBeforeWrite, result.filePath)
         setCurrentTags({ ...result.tags, filePath: result.filePath })
@@ -489,24 +626,41 @@ function App() {
     }
   }
 
-  /** Restore the pre-write backup for the current file. */
+  /** Restore the pre-write backups for every file written by the last save. */
   const handleUndo = async () => {
-    if (!filePath || !canUndo) return
+    if (!canUndo) return
     setLoading(true)
     setError('')
+    const renames = new Map()
+    let lastRestored = null
+    const failures = []
     try {
-      const restored = await window.electronAPI.undoMp3Write(filePath)
-      if (restored.filePath && restored.filePath !== filePath) {
-        replaceSelectedFilePath(filePath, restored.filePath)
+      for (const path of undoPaths) {
+        try {
+          const restored = await window.electronAPI.undoMp3Write(path)
+          if (restored.filePath && restored.filePath !== path) renames.set(path, restored.filePath)
+          if (path === filePath) lastRestored = restored
+        } catch (err) {
+          failures.push(`${basename(path)}: ${err.message}`)
+        }
       }
-      setCurrentTags(restored)
-      setCanUndo(false)
+      applyPathRenames(renames)
+      if (lastRestored) {
+        setCurrentTags(lastRestored)
+        if (lastRestored.filePath) setFilePath(lastRestored.filePath)
+      }
+      setUndoPaths([])
       setIsEditingTags(false)
       setManualDraft(null)
+      setBatchReloadToken((t) => t + 1)
       resetSelection()
-      setStatus(`Reverted to backup: ${restored.fileName}`)
-    } catch (err) {
-      setError(err.message)
+      const restoredCount = undoPaths.length - failures.length
+      setStatus(
+        undoPaths.length === 1 && lastRestored
+          ? `Reverted to backup: ${lastRestored.fileName}`
+          : `Reverted ${restoredCount} file${restoredCount === 1 ? '' : 's'} to backup`,
+      )
+      if (failures.length > 0) setError(`Undo failed for ${failures.join('; ')}`)
     } finally {
       setLoading(false)
     }
@@ -532,7 +686,7 @@ function App() {
     resetSelection()
     setMetadataResults([])
     setProviderErrors([])
-    setCanUndo(false)
+    setUndoPaths([])
     setFolderPath(null)
     setFilePaths(paths)
 
@@ -740,6 +894,22 @@ function App() {
                 <h2>{folderPath ? 'Folder' : 'Files'}</h2>
                 <span className="file-count">{filePaths.length}</span>
               </div>
+              {filePaths.length > 1 && (
+                <div className="file-selection-bar">
+                  <span className="muted">
+                    {isBatch ? `${selectedPaths.length} selected` : 'Ctrl/Shift+click to multi-select'}
+                  </span>
+                  {isBatch ? (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={handleClearSelection} disabled={loading}>
+                      Clear
+                    </button>
+                  ) : (
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={handleSelectAll} disabled={loading}>
+                      Select all
+                    </button>
+                  )}
+                </div>
+              )}
               {folderPath && (
                 <p className="folder-path" title={folderPath}>
                   {folderPath}
@@ -752,8 +922,9 @@ function App() {
                   <li key={path}>
                     <button
                       type="button"
-                      className={`file-item ${path === filePath ? 'active' : ''}`}
-                      onClick={() => handleSelectFile(path)}
+                      className={`file-item ${path === filePath ? 'active' : ''} ${isBatch && selectedPaths.includes(path) ? 'selected' : ''}`}
+                      onClick={(e) => handleFileClick(e, path)}
+                      aria-pressed={selectedPaths.includes(path)}
                       disabled={loading}
                       title={path}
                     >
@@ -767,6 +938,75 @@ function App() {
         )}
 
         <main className="main">
+          {isBatch ? (
+          <section className="panel current-tags batch-edit">
+            <div className="panel-header">
+              <h2>Batch Edit</h2>
+              <span className="file-count">{selectedPaths.length} files</span>
+              <div className="tag-edit-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => batchMerged && setBatchDraft(createBatchDraft(batchMerged))}
+                  disabled={loading || !batchLoaded}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={handleBatchSave}
+                  disabled={loading || !batchLoaded}
+                >
+                  Save to {selectedPaths.length} files
+                </button>
+              </div>
+            </div>
+            {!batchLoaded ? (
+              <p className="loading">Reading tags…</p>
+            ) : (
+              <form
+                className="manual-tag-form batch-tag-form"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  handleBatchSave()
+                }}
+              >
+                <p className="settings-hint">
+                  Fields showing {KEEP_PLACEHOLDER} differ between files and are left unchanged unless you type a value.
+                </p>
+                {TAG_FIELDS.map(({ key, label }) => {
+                  const mixed = batchMerged?.[key]?.mixed
+                  const kept = batchDraft[key] === null
+                  return (
+                    <label key={key} className="manual-tag-field">
+                      <span>{label}</span>
+                      <div className="batch-field-input">
+                        <input
+                          type="text"
+                          value={batchDraft[key] ?? ''}
+                          placeholder={kept ? KEEP_PLACEHOLDER : ''}
+                          onChange={(e) => updateBatchDraft(key, e.target.value)}
+                          disabled={loading}
+                        />
+                        {mixed && !kept && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => updateBatchDraft(key, null)}
+                            title="Keep each file's own value"
+                          >
+                            Keep
+                          </button>
+                        )}
+                      </div>
+                    </label>
+                  )
+                })}
+              </form>
+            )}
+          </section>
+          ) : (
           <section className="panel current-tags">
             <div className="panel-header">
               <h2>Current Tags</h2>
@@ -878,6 +1118,7 @@ function App() {
               </div>
             )}
           </section>
+          )}
 
           <section className="panel metadata-results">
             <div className="metadata-results-head">
