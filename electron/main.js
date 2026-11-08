@@ -180,6 +180,25 @@ ipcMain.handle('mp3:writeTags', async (_event, filePath, fields, includeArtwork,
   }
 })
 
+ipcMain.handle('mp3:rename', async (_event, filePath, template) => {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('No MP3 file selected')
+  }
+  const resolvedFilePath = path.resolve(filePath)
+  try {
+    const tags = await readMp3Tags(resolvedFilePath)
+    const renamedPath = await renameMp3File(resolvedFilePath, tags, template)
+    if (renamedPath !== resolvedFilePath) {
+      transferBackup(resolvedFilePath, renamedPath)
+      logger.info('Renamed file from tags', { from: path.basename(resolvedFilePath), to: path.basename(renamedPath) })
+    }
+    return { filePath: renamedPath, renamed: renamedPath !== resolvedFilePath }
+  } catch (err) {
+    logger.error('mp3:rename failed', { file: resolvedFilePath, error: err.message })
+    throw err
+  }
+})
+
 ipcMain.handle('mp3:undoWrite', async (_event, filePath) => {
   const resolvedFilePath = path.resolve(filePath)
   try {

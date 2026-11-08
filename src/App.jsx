@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { buildRenameFilename, DEFAULT_RENAME_TEMPLATE, RENAME_PLACEHOLDERS } from '@shared/rename-template.js'
 import { KEEP_PLACEHOLDER, buildBatchChanges, createBatchDraft, mergeTags } from '@shared/batch-tags.js'
 import { copyTags, findReplaceTags } from '@shared/tag-transforms.js'
+import { IGNORE_PLACEHOLDER, compileFilenamePattern, filenameTagChanges } from '@shared/filename-tags.js'
 import { THEME_OPTIONS, applyTheme, normalizeThemeMode } from './theme.js'
 import './App.css'
 
@@ -34,6 +35,14 @@ const SEARCH_PROVIDERS = [
   { key: 'musixmatch', name: 'Musixmatch', requiresKey: true },
   { key: 'lastfm', name: 'Last.fm', requiresKey: true },
   { key: 'spotify', name: 'Spotify', requiresKey: true },
+]
+
+/** Tabs in the tag tools popup. */
+const TAG_TOOL_MODES = [
+  { key: 'replace', label: 'Find & Replace' },
+  { key: 'copy', label: 'Copy Fields' },
+  { key: 'filename', label: 'Tags from Filename' },
+  { key: 'rename', label: 'Rename Files' },
 ]
 
 const DEFAULT_SEARCH_PROVIDERS = ['musicbrainz', 'itunes', 'deezer']
@@ -128,6 +137,8 @@ function App() {
     caseSensitive: false,
     target: 'albumArtist',
     format: '{artist}',
+    filenamePattern: '{artist} - {title}',
+    renameTemplate: DEFAULT_RENAME_TEMPLATE,
     clearSource: false,
   })
   const [isDragging, setIsDragging] = useState(false)
@@ -534,6 +545,7 @@ function App() {
     const targets = selectedPaths.length > 0 ? selectedPaths : filePath ? [filePath] : []
     if (targets.length === 0) return
     setError('')
+    if (mode === 'rename') updateToolOptions('renameTemplate', appSettings.renameTemplate || DEFAULT_RENAME_TEMPLATE)
     setTagTool({ mode, entries: null })
     try {
       const tagsList = await Promise.all(targets.map((p) => window.electronAPI.readMp3Tags(p)))
@@ -559,15 +571,28 @@ function App() {
   const toolPreview = useMemo(() => {
     if (!tagTool?.entries) return { rows: [], error: '' }
     try {
+      const compiled =
+        tagTool.mode === 'filename'
+          ? compileFilenamePattern(toolOptions.filenamePattern, TAG_FIELDS.map(({ key }) => key))
+          : null
+      const computeToolChanges = (path, tags) => {
+        switch (tagTool.mode) {
+          case 'replace':
+            return findReplaceTags(tags, toolOptions)
+          case 'copy':
+            return copyTags(tags, toolOptions)
+          case 'filename':
+            return filenameTagChanges(compiled, path, tags)
+          case 'rename': {
+            const next = buildRenameFilename(toolOptions.renameTemplate, tags, basename(path).replace(/\.mp3$/i, ''))
+            return next === basename(path) ? {} : { fileName: next }
+          }
+          default:
+            return {}
+        }
+      }
       const rows = tagTool.entries
-        .map(({ path, tags }) => ({
-          path,
-          tags,
-          changes:
-            tagTool.mode === 'replace'
-              ? findReplaceTags(tags, toolOptions)
-              : copyTags(tags, toolOptions),
-        }))
+        .map(({ path, tags }) => ({ path, tags, changes: computeToolChanges(path, tags) }))
         .filter((row) => Object.keys(row.changes).length > 0)
       return { rows, error: '' }
     } catch (err) {
@@ -577,9 +602,41 @@ function App() {
 
   const handleApplyTagTool = async () => {
     if (toolPreview.rows.length === 0) return
+    const mode = tagTool.mode
     const entries = toolPreview.rows.map(({ path, changes }) => ({ path, changes }))
     setTagTool(null)
-    await writeChangesToFiles(entries)
+    if (mode === 'rename') await renameFiles(entries.map(({ path }) => path))
+    else await writeChangesToFiles(entries)
+  }
+
+  /** Rename files on disk from their tags using the rename template from the tool. */
+  const renameFiles = async (paths) => {
+    const renames = new Map()
+    const failures = []
+    setLoading(true)
+    setError('')
+    try {
+      for (const [index, path] of paths.entries()) {
+        setStatus(`Renaming ${index + 1}/${paths.length}: ${basename(path)}`)
+        try {
+          const result = await window.electronAPI.renameMp3File(path, toolOptions.renameTemplate)
+          if (result.filePath !== path) renames.set(path, result.filePath)
+        } catch (err) {
+          failures.push(`${basename(path)}: ${err.message}`)
+        }
+      }
+      applyPathRenames(renames)
+      if (filePath && renames.has(filePath)) {
+        const newPath = renames.get(filePath)
+        setCurrentTags((prev) => (prev ? { ...prev, filePath: newPath, fileName: basename(newPath) } : prev))
+      }
+      // Undo restores tag backups by path; the old paths no longer exist after a rename.
+      setUndoPaths((prev) => prev.map((p) => renames.get(p) ?? p))
+      setStatus(`Renamed ${renames.size} of ${paths.length} file${paths.length === 1 ? '' : 's'}`)
+      if (failures.length > 0) setError(failures.join('; '))
+    } finally {
+      setLoading(false)
+    }
   }
 
   const applyWriteResult = useCallback(
@@ -1022,6 +1079,12 @@ function App() {
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('copy')} disabled={loading}>
                   Copy Fields
                 </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('filename')} disabled={loading}>
+                  From Filename
+                </button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('rename')} disabled={loading}>
+                  Rename
+                </button>
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
@@ -1097,6 +1160,12 @@ function App() {
                       </button>
                       <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('copy')} disabled={loading}>
                         Copy Fields
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('filename')} disabled={loading}>
+                        From Filename
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => openTagTool('rename')} disabled={loading}>
+                        Rename
                       </button>
                     </>
                   )}
@@ -1441,26 +1510,22 @@ function App() {
               aria-labelledby="tag-tool-title"
             >
               <div className="apply-modal-header">
-                <h2 id="tag-tool-title">{tagTool.mode === 'replace' ? 'Find & Replace' : 'Copy Fields'}</h2>
+                <h2 id="tag-tool-title">{TAG_TOOL_MODES.find((m) => m.key === tagTool.mode)?.label}</h2>
                 <button type="button" className="modal-close" onClick={() => setTagTool(null)} aria-label="Close">
                   ×
                 </button>
               </div>
               <div className="source-filters">
-                <button
-                  type="button"
-                  className={`source-chip ${tagTool.mode === 'replace' ? 'active' : ''}`}
-                  onClick={() => setTagTool((t) => ({ ...t, mode: 'replace' }))}
-                >
-                  Find &amp; Replace
-                </button>
-                <button
-                  type="button"
-                  className={`source-chip ${tagTool.mode === 'copy' ? 'active' : ''}`}
-                  onClick={() => setTagTool((t) => ({ ...t, mode: 'copy' }))}
-                >
-                  Copy Fields
-                </button>
+                {TAG_TOOL_MODES.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`source-chip ${tagTool.mode === key ? 'active' : ''}`}
+                    onClick={() => openTagTool(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
                 <span className="muted">
                   {tagTool.entries
                     ? `${tagTool.entries.length} file${tagTool.entries.length === 1 ? '' : 's'}`
@@ -1518,6 +1583,38 @@ function App() {
                       </label>
                     ))}
                   </div>
+                </div>
+              ) : tagTool.mode === 'filename' ? (
+                <div className="tag-tool-form">
+                  <label>
+                    Filename pattern
+                    <input
+                      type="text"
+                      value={toolOptions.filenamePattern}
+                      onChange={(e) => updateToolOptions('filenamePattern', e.target.value)}
+                      placeholder="{trackNumber} - {artist} - {title}"
+                      autoFocus
+                    />
+                  </label>
+                  <p className="settings-hint">
+                    Placeholders: {TAG_FIELDS.map(({ key }) => `{${key}}`).join(', ')}, {`{${IGNORE_PLACEHOLDER}}`} to skip text.
+                    Use <code>\</code> to read folder names too, e.g. <code>{String.raw`{artist}\{album}\{title}`}</code>.
+                    Files whose names don&apos;t fit the pattern are skipped.
+                  </p>
+                </div>
+              ) : tagTool.mode === 'rename' ? (
+                <div className="tag-tool-form">
+                  <label>
+                    Filename template
+                    <input
+                      type="text"
+                      value={toolOptions.renameTemplate}
+                      onChange={(e) => updateToolOptions('renameTemplate', e.target.value)}
+                      placeholder={DEFAULT_RENAME_TEMPLATE}
+                      autoFocus
+                    />
+                  </label>
+                  <p className="settings-hint">Placeholders: {RENAME_PLACEHOLDERS.join(', ')}</p>
                 </div>
               ) : (
                 <div className="tag-tool-form">
@@ -1579,8 +1676,8 @@ function App() {
                         Object.entries(changes).map(([key, value]) => (
                           <tr key={`${path}:${key}`}>
                             <td title={path}>{basename(path)}</td>
-                            <td>{TAG_FIELDS.find((f) => f.key === key)?.label ?? key}</td>
-                            <td className="muted">{tags[key] || '—'}</td>
+                            <td>{key === 'fileName' ? 'Filename' : (TAG_FIELDS.find((f) => f.key === key)?.label ?? key)}</td>
+                            <td className="muted">{(key === 'fileName' ? basename(path) : tags[key]) || '—'}</td>
                             <td>{value || '—'}</td>
                           </tr>
                         )),
@@ -1600,7 +1697,8 @@ function App() {
                   onClick={handleApplyTagTool}
                   disabled={loading || toolPreview.rows.length === 0}
                 >
-                  Apply to {toolPreview.rows.length} file{toolPreview.rows.length === 1 ? '' : 's'}
+                  {tagTool.mode === 'rename' ? 'Rename' : 'Apply to'} {toolPreview.rows.length} file
+                  {toolPreview.rows.length === 1 ? '' : 's'}
                 </button>
               </div>
             </div>
